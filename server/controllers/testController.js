@@ -1,0 +1,10 @@
+const healthCheck = async (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'RentEase API is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+  });
+};
+
+export { healthCheck };

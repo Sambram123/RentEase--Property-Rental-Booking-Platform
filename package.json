@@ -1,0 +1,18 @@
+{
+  "name": "rentease",
+  "version": "1.0.0",
+  "description": "Property rental and booking platform",
+  "private": true,
+  "scripts": {
+    "client": "npm run dev --prefix client",
+    "server": "npm run dev --prefix server",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "install:all": "npm install && npm install --prefix client && npm install --prefix server"
+  },
+  "keywords": ["rental", "booking", "mern", "property"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
