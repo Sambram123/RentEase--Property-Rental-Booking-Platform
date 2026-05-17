@@ -1,10 +1,11 @@
-const healthCheck = async (req, res) => {
+import asyncHandler from '../utils/asyncHandler.js';
+
+const healthCheck = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'RentEase API is running',
+    message: 'RentEase test route OK',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
   });
-};
+});
 
 export { healthCheck };
