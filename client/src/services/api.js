@@ -17,7 +17,7 @@ api.interceptors.response.use(
 );
 
 export const healthCheck = async () => {
-  const { data } = await api.get('/test');
+  const { data } = await api.get('/health');
   return data;
 };
 
