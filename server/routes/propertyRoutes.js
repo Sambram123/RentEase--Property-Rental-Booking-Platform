@@ -1,11 +1,29 @@
 import express from 'express';
+import {
+  createProperty,
+  getProperties,
+  getSingleProperty,
+  updateProperty,
+  deleteProperty,
+} from '../controllers/propertyController.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// GET    /api/properties — list properties
-// GET    /api/properties/:id — get property by id
-// POST   /api/properties — create property (protected)
-// PUT    /api/properties/:id — update property (protected)
-// DELETE /api/properties/:id — delete property (protected)
+// GET    /api/properties       — list all available properties (public)
+// POST   /api/properties       — create a new listing (protected)
+router
+  .route('/')
+  .get(getProperties)
+  .post(protect, createProperty);
+
+// GET    /api/properties/:id   — get property details (public)
+// PUT    /api/properties/:id   — update listing (protected)
+// DELETE /api/properties/:id   — remove listing (protected)
+router
+  .route('/:id')
+  .get(getSingleProperty)
+  .put(protect, updateProperty)
+  .delete(protect, deleteProperty);
 
 export default router;
