@@ -2,19 +2,76 @@ import mongoose from 'mongoose';
 
 const bookingSchema = new mongoose.Schema(
   {
-    property: { type: mongoose.Schema.Types.ObjectId, ref: 'Property', required: true },
-    tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    checkIn: { type: Date, required: true },
-    checkOut: { type: Date, required: true },
-    totalAmount: { type: Number, required: true, min: 0 },
-    status: {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: [true, 'Booking must belong to a user'],
+    },
+
+    property: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Property',
+      required: [true, 'Booking must reference a property'],
+    },
+
+    checkInDate: {
+      type: Date,
+      required: [true, 'Check-in date is required'],
+    },
+
+    checkOutDate: {
+      type: Date,
+      required: [true, 'Check-out date is required'],
+    },
+
+    totalAmount: {
+      type: Number,
+      required: [true, 'Total amount is required'],
+      min: [0, 'Total amount cannot be negative'],
+    },
+
+    advancePaid: {
+      type: Number,
+      default: 0,
+      min: [0, 'Advance paid cannot be negative'],
+    },
+
+    paymentStatus: {
       type: String,
-      enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+      enum: {
+        values: ['pending', 'paid', 'failed'],
+        message: '{VALUE} is not a valid payment status',
+      },
+      default: 'pending',
+    },
+
+    bookingStatus: {
+      type: String,
+      enum: {
+        values: ['pending', 'confirmed', 'cancelled', 'completed'],
+        message: '{VALUE} is not a valid booking status',
+      },
       default: 'pending',
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
+
+// ─── Validate check-out is after check-in ─────────────────────────────────────
+bookingSchema.pre('save', function (next) {
+  if (this.checkOutDate <= this.checkInDate) {
+    return next(new Error('Check-out date must be after check-in date'));
+  }
+  next();
+});
+
+// ─── Indexes ──────────────────────────────────────────────────────────────────
+bookingSchema.index({ user: 1 });
+bookingSchema.index({ property: 1 });
+bookingSchema.index({ bookingStatus: 1 });
+bookingSchema.index({ checkInDate: 1, checkOutDate: 1 });
 
 const Booking = mongoose.model('Booking', bookingSchema);
 
