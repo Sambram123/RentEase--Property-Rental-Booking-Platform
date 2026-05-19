@@ -6,24 +6,24 @@ import {
   updateProperty,
   deleteProperty,
 } from '../controllers/propertyController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, ownerOnly } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 // GET    /api/properties       — list all available properties (public)
-// POST   /api/properties       — create a new listing (protected)
+// POST   /api/properties       — create a new listing (owner / admin only)
 router
   .route('/')
   .get(getProperties)
-  .post(protect, createProperty);
+  .post(protect, ownerOnly, createProperty);
 
 // GET    /api/properties/:id   — get property details (public)
-// PUT    /api/properties/:id   — update listing (protected)
-// DELETE /api/properties/:id   — remove listing (protected)
+// PUT    /api/properties/:id   — update listing (owner / admin)
+// DELETE /api/properties/:id   — remove listing (owner / admin)
 router
   .route('/:id')
   .get(getSingleProperty)
-  .put(protect, updateProperty)
-  .delete(protect, deleteProperty);
+  .put(protect, ownerOnly, updateProperty)
+  .delete(protect, ownerOnly, deleteProperty);
 
 export default router;
