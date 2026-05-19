@@ -7,18 +7,31 @@ import Properties from '../pages/Properties';
 import PropertyDetails from '../pages/PropertyDetails';
 import Dashboard from '../pages/Dashboard';
 import NotFound from '../pages/NotFound';
+import ProtectedRoute from '../components/ProtectedRoute';
 
 const AppRoutes = () => {
   return (
     <Routes>
       <Route element={<MainLayout />}>
+        {/* ── Public routes ── */}
         <Route index element={<Home />} />
         <Route path="properties" element={<Properties />} />
         <Route path="properties/:id" element={<PropertyDetails />} />
-        <Route path="dashboard" element={<Dashboard />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
+
+        {/* ── Protected routes — requires authentication ── */}
+        <Route
+          path="dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
       </Route>
+
+      {/* 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
