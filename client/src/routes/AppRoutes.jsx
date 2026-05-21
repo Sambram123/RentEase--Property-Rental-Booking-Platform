@@ -5,6 +5,7 @@ import Login from '../pages/Login';
 import Register from '../pages/Register';
 import Properties from '../pages/Properties';
 import PropertyDetails from '../pages/PropertyDetails';
+import AddProperty from '../pages/AddProperty';
 import Dashboard from '../pages/Dashboard';
 import NotFound from '../pages/NotFound';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -20,12 +21,22 @@ const AppRoutes = () => {
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
 
-        {/* ── Protected routes — requires authentication ── */}
+        {/* ── Protected: any authenticated user ── */}
         <Route
           path="dashboard"
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ── Protected: owner / admin only ── */}
+        <Route
+          path="properties/add"
+          element={
+            <ProtectedRoute allowedRoles={['owner', 'admin']}>
+              <AddProperty />
             </ProtectedRoute>
           }
         />
