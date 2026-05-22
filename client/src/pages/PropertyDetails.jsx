@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   FiArrowLeft, FiMapPin, FiBed, FiDroplet, FiStar,
@@ -7,6 +7,7 @@ import {
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
 import { fetchPropertyById } from '../services/propertyService';
+import { createBooking } from '../services/bookingService';
 import { formatPrice, FEATURED_PROPERTIES } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 
@@ -26,17 +27,180 @@ const AMENITY_ICONS = {
 const PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&q=80';
 
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+const toISO = (d) => d.toISOString().split('T')[0];
+const today = () => toISO(new Date());
+
+const diffDays = (a, b) =>
+  Math.ceil((new Date(b) - new Date(a)) / (1000 * 60 * 60 * 24));
+
+const calcTotal = (pricePerMonth, checkIn, checkOut) => {
+  if (!checkIn || !checkOut || checkOut <= checkIn) return 0;
+  const days = diffDays(checkIn, checkOut);
+  return Math.round((pricePerMonth / 30) * days);
+};
+
+// ─── BookingPanel ─────────────────────────────────────────────────────────────
+const BookingPanel = ({ property, isAuthenticated, navigate, propertyId }) => {
+  const [checkIn,  setCheckIn]  = useState('');
+  const [checkOut, setCheckOut] = useState('');
+  const [loading,  setLoading]  = useState(false);
+
+  const price       = property.price ?? property.pricePerMonth ?? 0;
+  const nights      = checkIn && checkOut ? diffDays(checkIn, checkOut) : 0;
+  const totalAmount = useMemo(
+    () => calcTotal(price, checkIn, checkOut),
+    [price, checkIn, checkOut]
+  );
+
+  const isValidRange = checkIn && checkOut && checkOut > checkIn;
+
+  const handleBook = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please sign in to book this property');
+      navigate('/login', { state: { from: { pathname: `/properties/${propertyId}` } } });
+      return;
+    }
+    if (!checkIn || !checkOut) {
+      toast.error('Please select check-in and check-out dates');
+      return;
+    }
+    if (checkOut <= checkIn) {
+      toast.error('Check-out must be after check-in');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await createBooking({ propertyId, checkInDate: checkIn, checkOutDate: checkOut });
+      toast.success('Booking request sent! 🎉');
+      navigate('/my-bookings');
+    } catch (err) {
+      toast.error(err.message || 'Failed to create booking');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-md">
+      {/* Price header */}
+      <div className="mb-5">
+        <p className="text-3xl font-bold text-secondary">
+          {formatPrice(price)}
+        </p>
+        <p className="text-sm text-muted">per month</p>
+      </div>
+
+      {/* Date pickers */}
+      <div className="mb-4 grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">
+            Check-in
+          </label>
+          <input
+            type="date"
+            min={today()}
+            value={checkIn}
+            onChange={(e) => {
+              setCheckIn(e.target.value);
+              if (checkOut && e.target.value >= checkOut) setCheckOut('');
+            }}
+            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">
+            Check-out
+          </label>
+          <input
+            type="date"
+            min={checkIn || today()}
+            value={checkOut}
+            onChange={(e) => setCheckOut(e.target.value)}
+            disabled={!checkIn}
+            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+          />
+        </div>
+      </div>
+
+      {/* Summary */}
+      {isValidRange && (
+        <div className="mb-4 space-y-2 rounded-xl border border-gray-100 bg-gray-50/60 p-4 text-sm">
+          <div className="flex justify-between text-muted">
+            <span>
+              {formatPrice(price)} × {nights} night{nights !== 1 ? 's' : ''}
+            </span>
+            <span className="font-medium text-secondary">{formatPrice(totalAmount)}</span>
+          </div>
+          <div className="flex justify-between font-semibold text-secondary">
+            <span>Total</span>
+            <span className="text-primary">{formatPrice(totalAmount)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Key details */}
+      <ul className="mb-5 space-y-1.5 text-sm">
+        {[
+          ['Type',      property.type ? property.type.charAt(0).toUpperCase() + property.type.slice(1) : '—'],
+          ['Bedrooms',  property.bedrooms],
+          ['Bathrooms', property.bathrooms],
+          ['City',      property.city || property.address?.city],
+        ].map(([label, val]) => (
+          <li key={label} className="flex justify-between border-b border-gray-50 py-1.5">
+            <span className="text-muted">{label}</span>
+            <span className="font-medium capitalize text-secondary">{val}</span>
+          </li>
+        ))}
+      </ul>
+
+      {/* CTA */}
+      <button
+        type="button"
+        onClick={handleBook}
+        disabled={loading || !property.availability}
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {loading ? (
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+        ) : (
+          <FiCalendar className="h-4 w-4" />
+        )}
+        {loading
+          ? 'Requesting…'
+          : property.availability
+            ? 'Request booking'
+            : 'Not available'}
+      </button>
+
+      {!isAuthenticated && (
+        <p className="mt-3 text-center text-xs text-muted">
+          <Link to="/login" className="font-medium text-primary hover:underline">
+            Sign in
+          </Link>{' '}
+          to book this property
+        </p>
+      )}
+
+      <p className="mt-3 text-center text-xs text-muted">
+        No payment required yet — owner will confirm your request.
+      </p>
+    </div>
+  );
+};
+
+// ─── Main component ───────────────────────────────────────────────────────────
 const PropertyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
-  const [property, setProperty] = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState('');
+  const [property,  setProperty]  = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState('');
   const [activeImg, setActiveImg] = useState(0);
 
-  // ── Fetch property ────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -45,18 +209,17 @@ const PropertyDetails = () => {
         const data = await fetchPropertyById(id);
         setProperty(data);
       } catch {
-        // Fallback: try mock data (handles legacy IDs like '1', '2'…)
         const mock = FEATURED_PROPERTIES.find((p) => p.id === id);
         if (mock) {
           setProperty({
             ...mock,
-            _id: mock.id,
-            price: mock.pricePerMonth,
-            images: [mock.image],
+            _id:         mock.id,
+            price:       mock.pricePerMonth,
+            images:      [mock.image],
             description: 'A beautiful property available for rent.',
-            type: 'apartment',
-            address: { city: mock.location, state: '', country: 'India' },
-            amenities: ['wifi', 'parking'],
+            type:        'apartment',
+            address:     { city: mock.location, state: '', country: 'India' },
+            amenities:   ['wifi', 'parking'],
             availability: true,
           });
         } else {
@@ -69,21 +232,11 @@ const PropertyDetails = () => {
     load();
   }, [id]);
 
-  const handleBookNow = () => {
-    if (!isAuthenticated) {
-      toast.error('Please log in to book this property');
-      navigate('/login', { state: { from: { pathname: `/properties/${id}` } } });
-      return;
-    }
-    toast.success('Booking coming soon! Stay tuned 🎉');
-  };
-
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
     toast.success('Link copied to clipboard!');
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -112,14 +265,12 @@ const PropertyDetails = () => {
 
   const images    = property.images?.length ? property.images : [PLACEHOLDER_IMAGE];
   const address   = property.address || {};
-  const cityLabel = property.city || address.city || address.state || '';
+  const cityLabel = property.city || address.city || '';
   const fullAddr  = [address.street, address.city, address.state, address.country]
     .filter(Boolean).join(', ');
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-
-      {/* Back link */}
       <Link
         to="/properties"
         className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-muted transition hover:text-primary"
@@ -132,7 +283,7 @@ const PropertyDetails = () => {
         {/* ── Left column ─────────────────────────────────────────────── */}
         <div className="space-y-6">
 
-          {/* Image gallery */}
+          {/* Gallery */}
           <div>
             <div className="relative aspect-[16/9] overflow-hidden rounded-2xl shadow-md">
               <img
@@ -141,13 +292,11 @@ const PropertyDetails = () => {
                 className="h-full w-full object-cover"
                 onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }}
               />
-              {/* Availability badge */}
               {!property.availability && (
                 <span className="absolute left-4 top-4 rounded-full bg-gray-800/80 px-3 py-1 text-xs font-semibold text-white">
                   Currently unavailable
                 </span>
               )}
-              {/* Share */}
               <button
                 type="button"
                 onClick={handleShare}
@@ -156,8 +305,6 @@ const PropertyDetails = () => {
                 <FiShare2 className="h-4 w-4 text-secondary" />
               </button>
             </div>
-
-            {/* Thumbnails */}
             {images.length > 1 && (
               <div className="mt-3 flex gap-2 overflow-x-auto">
                 {images.map((img, idx) => (
@@ -168,12 +315,8 @@ const PropertyDetails = () => {
                       activeImg === idx ? 'border-primary' : 'border-transparent'
                     }`}
                   >
-                    <img
-                      src={img}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }}
-                    />
+                    <img src={img} alt="" className="h-full w-full object-cover"
+                      onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }} />
                   </button>
                 ))}
               </div>
@@ -201,14 +344,10 @@ const PropertyDetails = () => {
                   <span className="font-semibold text-secondary">
                     {Number(property.rating).toFixed(1)}
                   </span>
-                  <span className="text-xs text-muted">
-                    ({property.reviewsCount || 0} reviews)
-                  </span>
+                  <span className="text-xs text-muted">({property.reviewsCount || 0} reviews)</span>
                 </div>
               )}
             </div>
-
-            {/* Stats row */}
             <div className="mt-4 flex flex-wrap gap-4">
               <span className="flex items-center gap-1.5 text-sm text-secondary">
                 <FiBed className="h-4 w-4 text-primary" />
@@ -241,10 +380,7 @@ const PropertyDetails = () => {
                 {property.amenities.map((a) => {
                   const meta = AMENITY_ICONS[a];
                   return (
-                    <div
-                      key={a}
-                      className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3 text-sm font-medium text-secondary"
-                    >
+                    <div key={a} className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3 text-sm font-medium text-secondary">
                       <span>{meta?.icon || '✅'}</span>
                       {meta?.label || a}
                     </div>
@@ -260,11 +396,8 @@ const PropertyDetails = () => {
               <h2 className="mb-4 font-semibold text-secondary">Listed by</h2>
               <div className="flex items-center gap-3">
                 {property.owner.avatar ? (
-                  <img
-                    src={property.owner.avatar}
-                    alt={property.owner.name}
-                    className="h-12 w-12 rounded-full object-cover"
-                  />
+                  <img src={property.owner.avatar} alt={property.owner.name}
+                    className="h-12 w-12 rounded-full object-cover" />
                 ) : (
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                     <FiUser className="h-5 w-5 text-primary" />
@@ -277,60 +410,16 @@ const PropertyDetails = () => {
               </div>
             </div>
           )}
-
         </div>
 
-        {/* ── Right column — Booking CTA ──────────────────────────────── */}
-        <div className="lg:sticky lg:top-24 h-fit">
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-md">
-            {/* Price */}
-            <div className="mb-4">
-              <p className="text-3xl font-bold text-secondary">
-                {formatPrice(property.price ?? property.pricePerMonth ?? 0)}
-              </p>
-              <p className="text-sm text-muted">per month</p>
-            </div>
-
-            {/* Key details */}
-            <ul className="mb-5 space-y-2 text-sm text-secondary">
-              <li className="flex justify-between border-b border-gray-50 py-2">
-                <span className="text-muted">Type</span>
-                <span className="font-medium capitalize">{property.type}</span>
-              </li>
-              <li className="flex justify-between border-b border-gray-50 py-2">
-                <span className="text-muted">Bedrooms</span>
-                <span className="font-medium">{property.bedrooms}</span>
-              </li>
-              <li className="flex justify-between border-b border-gray-50 py-2">
-                <span className="text-muted">Bathrooms</span>
-                <span className="font-medium">{property.bathrooms}</span>
-              </li>
-              <li className="flex justify-between py-2">
-                <span className="text-muted">City</span>
-                <span className="font-medium">{cityLabel}</span>
-              </li>
-            </ul>
-
-            {/* CTA */}
-            <button
-              type="button"
-              onClick={handleBookNow}
-              disabled={!property.availability}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <FiCalendar className="h-4 w-4" />
-              {property.availability ? 'Book now' : 'Not available'}
-            </button>
-
-            {!isAuthenticated && (
-              <p className="mt-3 text-center text-xs text-muted">
-                <Link to="/login" className="font-medium text-primary hover:underline">
-                  Sign in
-                </Link>{' '}
-                to book this property
-              </p>
-            )}
-          </div>
+        {/* ── Right column — Booking panel ────────────────────────────── */}
+        <div className="h-fit lg:sticky lg:top-24">
+          <BookingPanel
+            property={property}
+            isAuthenticated={isAuthenticated}
+            navigate={navigate}
+            propertyId={property._id || id}
+          />
         </div>
 
       </div>
