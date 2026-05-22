@@ -7,6 +7,7 @@ import Properties from '../pages/Properties';
 import PropertyDetails from '../pages/PropertyDetails';
 import AddProperty from '../pages/AddProperty';
 import Dashboard from '../pages/Dashboard';
+import MyBookings from '../pages/MyBookings';
 import NotFound from '../pages/NotFound';
 import ProtectedRoute from '../components/ProtectedRoute';
 
@@ -27,6 +28,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="my-bookings"
+          element={
+            <ProtectedRoute>
+              <MyBookings />
             </ProtectedRoute>
           }
         />
