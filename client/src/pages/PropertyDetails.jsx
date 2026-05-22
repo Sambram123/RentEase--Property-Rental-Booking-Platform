@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
-  FiArrowLeft, FiMapPin, FiBed, FiDroplet, FiStar,
+  FiArrowLeft, FiMapPin, FiHome, FiDroplet, FiStar,
   FiCalendar, FiUser, FiCheckCircle, FiShare2,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
@@ -350,7 +350,7 @@ const PropertyDetails = () => {
             </div>
             <div className="mt-4 flex flex-wrap gap-4">
               <span className="flex items-center gap-1.5 text-sm text-secondary">
-                <FiBed className="h-4 w-4 text-primary" />
+                <FiHome className="h-4 w-4 text-primary" />
                 {property.bedrooms} Bedroom{property.bedrooms !== 1 ? 's' : ''}
               </span>
               <span className="flex items-center gap-1.5 text-sm text-secondary">
