@@ -8,6 +8,9 @@ import PropertyDetails from '../pages/PropertyDetails';
 import AddProperty from '../pages/AddProperty';
 import Dashboard from '../pages/Dashboard';
 import MyBookings from '../pages/MyBookings';
+import MyPayments from '../pages/MyPayments';
+import PaymentSuccess from '../pages/PaymentSuccess';
+import PaymentFailed from '../pages/PaymentFailed';
 import NotFound from '../pages/NotFound';
 import ProtectedRoute from '../components/ProtectedRoute';
 
@@ -36,6 +39,30 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <MyBookings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="my-payments"
+          element={
+            <ProtectedRoute>
+              <MyPayments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="payment/success"
+          element={
+            <ProtectedRoute>
+              <PaymentSuccess />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="payment/failed"
+          element={
+            <ProtectedRoute>
+              <PaymentFailed />
             </ProtectedRoute>
           }
         />

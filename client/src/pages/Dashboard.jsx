@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom';
 import {
   FiCalendar, FiHome, FiPlus, FiEdit2, FiTrash2,
   FiEye, FiToggleLeft, FiToggleRight, FiCheckCircle,
-  FiXCircle, FiClock, FiUser,
+  FiXCircle, FiClock, FiUser, FiCreditCard, FiDollarSign,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import Loader from '../components/Loader';
 import { fetchMyProperties, deleteProperty } from '../services/propertyService';
 import { fetchOwnerBookings, updateBookingStatus } from '../services/bookingService';
+import { fetchOwnerPayments } from '../services/paymentService';
 import { formatPrice } from '../utils/constants';
 
 const PLACEHOLDER =
@@ -46,6 +47,21 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+const PAYMENT_STATUS = {
+  pending: { cls: 'bg-amber-50 text-amber-600', label: 'Payment pending' },
+  paid:    { cls: 'bg-green-50 text-green-600',  label: 'Paid' },
+  failed:  { cls: 'bg-red-50 text-red-500',     label: 'Payment failed' },
+};
+
+const PaymentBadge = ({ status }) => {
+  const s = PAYMENT_STATUS[status] || PAYMENT_STATUS.pending;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${s.cls}`}>
+      <FiCreditCard className="h-3 w-3" /> {s.label}
+    </span>
+  );
+};
+
 const fmtDate = (d) =>
   new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -56,6 +72,8 @@ const Dashboard = () => {
 
   const [myProperties,  setMyProperties]  = useState([]);
   const [ownerBookings, setOwnerBookings] = useState([]);
+  const [ownerRevenue,  setOwnerRevenue]  = useState(0);
+  const [paidCount,     setPaidCount]     = useState(0);
   const [loadingProps,  setLoadingProps]  = useState(false);
   const [loadingBks,    setLoadingBks]    = useState(false);
   const [deletingId,    setDeletingId]    = useState(null);
@@ -91,6 +109,21 @@ const Dashboard = () => {
         // silently skip
       } finally {
         setLoadingBks(false);
+      }
+    };
+    load();
+  }, [isOwnerOrAdmin]);
+
+  // ── Load owner payment revenue ────────────────────────────────────────────
+  useEffect(() => {
+    if (!isOwnerOrAdmin) return;
+    const load = async () => {
+      try {
+        const result = await fetchOwnerPayments();
+        setOwnerRevenue(result.totalRevenue || 0);
+        setPaidCount(result.count || 0);
+      } catch {
+        // silently skip
       }
     };
     load();
@@ -161,6 +194,12 @@ const Dashboard = () => {
           >
             <FiCalendar className="h-4 w-4" /> My bookings
           </Link>
+          <Link
+            to="/my-payments"
+            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
+          >
+            <FiCreditCard className="h-4 w-4" /> Payments
+          </Link>
           {isOwnerOrAdmin && (
             <Link
               to="/properties/add"
@@ -180,6 +219,8 @@ const Dashboard = () => {
           <>
             <StatCard icon={FiHome}        label="My listings"    value={myProperties.length} />
             <StatCard icon={FiToggleRight} label="Active listings" value={activeCount} />
+            <StatCard icon={FiDollarSign}  label="Advance received" value={formatPrice(ownerRevenue)} color="text-green-600" />
+            <StatCard icon={FiCreditCard}  label="Paid bookings"  value={paidCount} />
           </>
         )}
       </div>
@@ -267,7 +308,10 @@ const Dashboard = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <p className="line-clamp-1 font-semibold text-secondary">{prop.title}</p>
-                          <StatusBadge status={bk.bookingStatus} />
+                          <div className="flex flex-wrap gap-1.5">
+                            <StatusBadge status={bk.bookingStatus} />
+                            <PaymentBadge status={bk.paymentStatus} />
+                          </div>
                         </div>
                         <div className="mt-1.5 flex flex-wrap gap-4 text-xs text-muted">
                           <span className="flex items-center gap-1">
@@ -280,6 +324,11 @@ const Dashboard = () => {
                         </div>
                         <p className="mt-1 text-sm font-semibold text-secondary">
                           {formatPrice(bk.totalAmount)}
+                          {bk.paymentStatus === 'paid' && bk.advancePaid > 0 && (
+                            <span className="ml-2 text-xs font-normal text-green-600">
+                              · {formatPrice(bk.advancePaid)} advance received
+                            </span>
+                          )}
                         </p>
                       </div>
 

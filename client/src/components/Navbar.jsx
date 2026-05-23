@@ -57,9 +57,14 @@ const Navbar = () => {
             </NavLink>
           ))}
           {isAuthenticated && (
-            <NavLink to="/dashboard" className={linkClass}>
-              Dashboard
-            </NavLink>
+            <>
+              <NavLink to="/dashboard" className={linkClass}>
+                Dashboard
+              </NavLink>
+              <NavLink to="/my-payments" className={linkClass}>
+                Payments
+              </NavLink>
+            </>
           )}
         </div>
 
@@ -151,6 +156,13 @@ const Navbar = () => {
                   onClick={() => setMenuOpen(false)}
                 >
                   Dashboard
+                </NavLink>
+                <NavLink
+                  to="/my-payments"
+                  className={linkClass}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Payments
                 </NavLink>
 
                 {/* User info */}

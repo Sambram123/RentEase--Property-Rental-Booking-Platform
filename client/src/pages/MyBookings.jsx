@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   FiCalendar, FiMapPin, FiHome, FiArrowLeft,
-  FiClock, FiCheckCircle, FiXCircle, FiAlertCircle,
+  FiClock, FiCheckCircle, FiXCircle, FiAlertCircle, FiCreditCard,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
 import { fetchMyBookings, updateBookingStatus } from '../services/bookingService';
+import { createPaymentOrder, verifyPayment } from '../services/paymentService';
+import { openRazorpayCheckout } from '../utils/razorpayCheckout';
+import { useAuth } from '../context/AuthContext';
 import { formatPrice } from '../utils/constants';
 
 const PLACEHOLDER =
@@ -64,7 +67,7 @@ const StatusBadge = ({ status }) => {
 };
 
 // ─── BookingCard ──────────────────────────────────────────────────────────────
-const BookingCard = ({ booking, onCancel, cancelling }) => {
+const BookingCard = ({ booking, onCancel, cancelling, onPay, paying }) => {
   const prop   = booking.property || {};
   const image  = (Array.isArray(prop.images) && prop.images[0]) || PLACEHOLDER;
   const city   = prop.city || prop.address?.city || '';
@@ -73,6 +76,10 @@ const BookingCard = ({ booking, onCancel, cancelling }) => {
   const canCancel =
     booking.bookingStatus === 'pending' ||
     booking.bookingStatus === 'confirmed';
+
+  const canPay =
+    booking.paymentStatus === 'pending' &&
+    booking.bookingStatus !== 'cancelled';
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-md">
@@ -139,7 +146,22 @@ const BookingCard = ({ booking, onCancel, cancelling }) => {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {canPay && (
+                <button
+                  type="button"
+                  disabled={paying === booking._id}
+                  onClick={() => onPay(booking)}
+                  className="flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-dark disabled:opacity-50"
+                >
+                  {paying === booking._id ? (
+                    <span className="h-3 w-3 animate-spin rounded-full border border-white/40 border-t-white" />
+                  ) : (
+                    <FiCreditCard className="h-3.5 w-3.5" />
+                  )}
+                  Pay advance
+                </button>
+              )}
               <Link
                 to={`/properties/${prop._id || prop}`}
                 className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-medium text-secondary transition hover:bg-gray-50"
@@ -172,9 +194,12 @@ const BookingCard = ({ booking, onCancel, cancelling }) => {
 
 // ─── MyBookings page ──────────────────────────────────────────────────────────
 const MyBookings = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [bookings,   setBookings]   = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [cancelling, setCancelling] = useState(null);
+  const [paying,     setPaying]     = useState(null);
   const [filter,     setFilter]     = useState('all');
 
   const load = async () => {
@@ -190,6 +215,59 @@ const MyBookings = () => {
   };
 
   useEffect(() => { load(); }, []);
+
+  const handlePay = async (booking) => {
+    const prop = booking.property || {};
+    setPaying(booking._id);
+    try {
+      const orderData = await createPaymentOrder(booking._id);
+      const response = await openRazorpayCheckout({
+        orderId: orderData.orderId,
+        amount: orderData.amount,
+        keyId: orderData.keyId,
+        user,
+        propertyTitle: prop.title,
+      });
+      const verified = await verifyPayment({
+        bookingId: booking._id,
+        razorpay_order_id: response.razorpay_order_id,
+        razorpay_payment_id: response.razorpay_payment_id,
+        razorpay_signature: response.razorpay_signature,
+      });
+      setBookings((prev) =>
+        prev.map((b) =>
+          b._id === booking._id
+            ? { ...b, paymentStatus: 'paid', bookingStatus: verified.booking?.bookingStatus || 'confirmed', advancePaid: orderData.amount }
+            : b
+        )
+      );
+      toast.success('Payment successful!');
+      navigate('/payment/success', {
+        state: {
+          bookingId: booking._id,
+          paymentId: response.razorpay_payment_id,
+          orderId: response.razorpay_order_id,
+          amount: orderData.amount,
+          property: { title: prop.title },
+        },
+      });
+    } catch (err) {
+      if (err.code !== 'PAYMENT_CANCELLED') {
+        toast.error(err.message || 'Payment failed');
+        navigate('/payment/failed', {
+          state: {
+            message: err.message,
+            bookingId: booking._id,
+            amount: booking.totalAmount,
+            propertyTitle: prop.title,
+            retryPath: '/my-bookings',
+          },
+        });
+      }
+    } finally {
+      setPaying(null);
+    }
+  };
 
   const handleCancel = async (id) => {
     if (!window.confirm('Cancel this booking?')) return;
@@ -293,6 +371,8 @@ const MyBookings = () => {
               booking={booking}
               onCancel={handleCancel}
               cancelling={cancelling}
+              onPay={handlePay}
+              paying={paying}
             />
           ))}
         </div>

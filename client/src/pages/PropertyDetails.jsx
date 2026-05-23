@@ -8,6 +8,8 @@ import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
 import { fetchPropertyById } from '../services/propertyService';
 import { createBooking } from '../services/bookingService';
+import { createPaymentOrder, verifyPayment } from '../services/paymentService';
+import { openRazorpayCheckout } from '../utils/razorpayCheckout';
 import { formatPrice, FEATURED_PROPERTIES } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 
@@ -41,10 +43,15 @@ const calcTotal = (pricePerMonth, checkIn, checkOut) => {
 };
 
 // ─── BookingPanel ─────────────────────────────────────────────────────────────
-const BookingPanel = ({ property, isAuthenticated, navigate, propertyId }) => {
+const ADVANCE_PERCENT = 0.3;
+const MIN_ADVANCE = 100;
+const calcAdvance = (total) => Math.max(Math.round(total * ADVANCE_PERCENT), MIN_ADVANCE);
+
+const BookingPanel = ({ property, isAuthenticated, navigate, propertyId, user }) => {
   const [checkIn,  setCheckIn]  = useState('');
   const [checkOut, setCheckOut] = useState('');
   const [loading,  setLoading]  = useState(false);
+  const [paying,   setPaying]   = useState(false);
 
   const price       = property.price ?? property.pricePerMonth ?? 0;
   const nights      = checkIn && checkOut ? diffDays(checkIn, checkOut) : 0;
@@ -54,6 +61,59 @@ const BookingPanel = ({ property, isAuthenticated, navigate, propertyId }) => {
   );
 
   const isValidRange = checkIn && checkOut && checkOut > checkIn;
+  const advanceAmount = isValidRange ? calcAdvance(totalAmount) : 0;
+
+  const processPayment = async (booking) => {
+    setPaying(true);
+    try {
+      const orderData = await createPaymentOrder(booking._id);
+
+      const response = await openRazorpayCheckout({
+        orderId: orderData.orderId,
+        amount: orderData.amount,
+        keyId: orderData.keyId,
+        user,
+        propertyTitle: property.title,
+      });
+
+      const verified = await verifyPayment({
+        bookingId: booking._id,
+        razorpay_order_id: response.razorpay_order_id,
+        razorpay_payment_id: response.razorpay_payment_id,
+        razorpay_signature: response.razorpay_signature,
+      });
+
+      toast.success('Payment successful! Booking confirmed.');
+      navigate('/payment/success', {
+        state: {
+          bookingId: booking._id,
+          booking: verified.booking,
+          paymentId: response.razorpay_payment_id,
+          orderId: response.razorpay_order_id,
+          amount: orderData.amount,
+          property: { title: property.title },
+        },
+      });
+    } catch (err) {
+      if (err.code === 'PAYMENT_CANCELLED') {
+        toast.error('Payment cancelled');
+        navigate('/my-bookings');
+        return;
+      }
+      toast.error(err.message || 'Payment failed');
+      navigate('/payment/failed', {
+        state: {
+          message: err.message,
+          bookingId: booking._id,
+          amount: advanceAmount,
+          propertyTitle: property.title,
+          retryPath: `/properties/${propertyId}`,
+        },
+      });
+    } finally {
+      setPaying(false);
+    }
+  };
 
   const handleBook = async () => {
     if (!isAuthenticated) {
@@ -72,9 +132,9 @@ const BookingPanel = ({ property, isAuthenticated, navigate, propertyId }) => {
 
     setLoading(true);
     try {
-      await createBooking({ propertyId, checkInDate: checkIn, checkOutDate: checkOut });
-      toast.success('Booking request sent! 🎉');
-      navigate('/my-bookings');
+      const booking = await createBooking({ propertyId, checkInDate: checkIn, checkOutDate: checkOut });
+      toast.success('Booking created — opening payment…');
+      await processPayment(booking);
     } catch (err) {
       toast.error(err.message || 'Failed to create booking');
     } finally {
@@ -137,6 +197,10 @@ const BookingPanel = ({ property, isAuthenticated, navigate, propertyId }) => {
             <span>Total</span>
             <span className="text-primary">{formatPrice(totalAmount)}</span>
           </div>
+          <div className="flex justify-between text-muted">
+            <span>Advance due now (30%)</span>
+            <span className="font-medium text-secondary">{formatPrice(advanceAmount)}</span>
+          </div>
         </div>
       )}
 
@@ -159,19 +223,21 @@ const BookingPanel = ({ property, isAuthenticated, navigate, propertyId }) => {
       <button
         type="button"
         onClick={handleBook}
-        disabled={loading || !property.availability}
+        disabled={loading || paying || !property.availability || !isValidRange}
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {loading ? (
+        {(loading || paying) ? (
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
         ) : (
           <FiCalendar className="h-4 w-4" />
         )}
         {loading
-          ? 'Requesting…'
-          : property.availability
-            ? 'Request booking'
-            : 'Not available'}
+          ? 'Creating booking…'
+          : paying
+            ? 'Processing payment…'
+            : property.availability
+              ? 'Book & pay advance'
+              : 'Not available'}
       </button>
 
       {!isAuthenticated && (
@@ -184,7 +250,7 @@ const BookingPanel = ({ property, isAuthenticated, navigate, propertyId }) => {
       )}
 
       <p className="mt-3 text-center text-xs text-muted">
-        No payment required yet — owner will confirm your request.
+        Pay a 30% advance via Razorpay to confirm your booking instantly.
       </p>
     </div>
   );
@@ -194,7 +260,7 @@ const BookingPanel = ({ property, isAuthenticated, navigate, propertyId }) => {
 const PropertyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const [property,  setProperty]  = useState(null);
   const [loading,   setLoading]   = useState(true);
@@ -419,6 +485,7 @@ const PropertyDetails = () => {
             isAuthenticated={isAuthenticated}
             navigate={navigate}
             propertyId={property._id || id}
+            user={user}
           />
         </div>
 
