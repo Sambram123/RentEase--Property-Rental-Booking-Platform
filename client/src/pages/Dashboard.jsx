@@ -233,12 +233,20 @@ const Dashboard = () => {
           <p className="mt-2 text-sm text-muted">
             Browse hundreds of verified rental properties across India.
           </p>
-          <Link
-            to="/properties"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark"
-          >
-            Browse properties
-          </Link>
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <Link
+              to="/properties"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark"
+            >
+              Browse properties
+            </Link>
+            <Link
+              to="/my-payments"
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-6 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
+            >
+              <FiCreditCard className="h-4 w-4" /> Payment history
+            </Link>
+          </div>
         </div>
       )}
 

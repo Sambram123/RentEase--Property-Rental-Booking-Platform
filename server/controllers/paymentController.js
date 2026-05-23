@@ -3,6 +3,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import { razorpay, keyId } from '../utils/razorpay.js';
 import Booking from '../models/Booking.js';
 import Payment from '../models/Payment.js';
+import Property from '../models/Property.js';
 
 // Advance = 30% of total rent, minimum ₹100
 const ADVANCE_PERCENT = 0.3;
@@ -46,6 +47,11 @@ const createOrder = asyncHandler(async (req, res) => {
   if (booking.paymentStatus === 'paid') {
     res.status(400);
     throw new Error('Advance payment already completed for this booking');
+  }
+
+  if (booking.paymentStatus === 'failed') {
+    booking.paymentStatus = 'pending';
+    await booking.save();
   }
 
   if (booking.bookingStatus === 'cancelled') {
@@ -216,7 +222,6 @@ const getOwnerPayments = asyncHandler(async (req, res) => {
     throw new Error('Access denied — property owners only');
   }
 
-  const Property = (await import('../models/Property.js')).default;
   const myProperties = await Property.find({ owner: req.user._id }).select('_id');
   const propertyIds = myProperties.map((p) => p._id);
 
