@@ -1,11 +1,10 @@
+import 'dotenv/config';               // side-effect: loads .env before other imports
+
 import express from 'express';
-import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import applyMiddleware from './middleware/index.js';
 import registerRoutes from './routes/index.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

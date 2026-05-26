@@ -89,13 +89,13 @@ export const AuthProvider = ({ children }) => {
    * 1. Creates Firebase user
    * 2. POSTs to our backend → gets JWT
    */
-  const register = useCallback(async (name, email, password) => {
+  const register = useCallback(async (name, email, password, role) => {
     // Create Firebase account first
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(credential.user, { displayName: name });
 
     // Persist to our backend and get JWT
-    const { data } = await api.post('/auth/register', { name, email, password });
+    const { data } = await api.post('/auth/register', { name, email, password, role });
     await syncBackendUser(data.data);
     return data.data.user;
   }, [syncBackendUser]);

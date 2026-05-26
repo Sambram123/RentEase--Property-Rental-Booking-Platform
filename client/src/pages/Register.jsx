@@ -42,7 +42,7 @@ const Register = () => {
 
     setLoading(true);
     try {
-      await register(form.name.trim(), form.email.trim(), form.password);
+      await register(form.name.trim(), form.email.trim(), form.password, form.role);
       toast.success('Account created! Welcome to RentEase 🎉');
       navigate('/dashboard', { replace: true });
     } catch (err) {
