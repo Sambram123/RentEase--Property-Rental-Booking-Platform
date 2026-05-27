@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { createProperty } from '../services/propertyService';
+import LocationPicker from '../components/LocationPicker';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const PROPERTY_TYPES = [
@@ -75,6 +76,7 @@ const AddProperty = () => {
   const [form, setForm]       = useState(INITIAL_FORM);
   const [errors, setErrors]   = useState({});
   const [loading, setLoading] = useState(false);
+  const [coords, setCoords]   = useState(null); // { lat, lng } from LocationPicker
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -136,6 +138,13 @@ const AddProperty = () => {
       amenities:    form.amenities,
       images,
       availability: form.availability,
+      // GeoJSON — [lng, lat] order per MongoDB convention
+      ...(coords && {
+        location: {
+          type: 'Point',
+          coordinates: [coords.lng, coords.lat],
+        },
+      }),
     };
 
     setLoading(true);
@@ -394,6 +403,24 @@ const AddProperty = () => {
               );
             })}
           </div>
+        </section>
+
+        {/* ── Location picker ───────────────────────────────────────────── */}
+        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <SectionTitle icon={FiMapPin} title="Pin location on map (optional)" />
+          <p className="mb-4 text-xs text-muted">
+            Click on the map or search an address to mark the exact property location. This enables map views on the listing.
+          </p>
+          <LocationPicker
+            coords={coords}
+            onChange={setCoords}
+            addressHint={[form.street, form.city, form.state, form.country].filter(Boolean).join(', ')}
+          />
+          {coords && (
+            <p className="mt-2 text-xs text-green-600">
+              ✓ Location pinned: {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+            </p>
+          )}
         </section>
 
         {/* ── Images ────────────────────────────────────────────────────── */}

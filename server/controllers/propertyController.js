@@ -39,7 +39,7 @@ const createProperty = asyncHandler(async (req, res) => {
   const {
     title, description, type, price,
     address, bedrooms, bathrooms, amenities,
-    images, availability,
+    images, availability, location,
   } = req.body;
 
   // ── Required field validation ─────────────────────────────────────────────
@@ -65,6 +65,12 @@ const createProperty = asyncHandler(async (req, res) => {
     ? amenities.filter((a) => VALID_AMENITIES.includes(a))
     : [];
 
+  // Validate location if provided
+  let cleanLocation;
+  if (location?.coordinates && Array.isArray(location.coordinates) && location.coordinates.length === 2) {
+    cleanLocation = { type: 'Point', coordinates: location.coordinates };
+  }
+
   const property = await Property.create({
     title:       title.trim(),
     description: description.trim(),
@@ -77,6 +83,7 @@ const createProperty = asyncHandler(async (req, res) => {
     images:      Array.isArray(images) ? images : [],
     availability: availability !== false,
     owner:       req.user._id,
+    ...(cleanLocation && { location: cleanLocation }),
   });
 
   res.status(201).json({
@@ -202,6 +209,11 @@ const updateProperty = asyncHandler(async (req, res) => {
       property[field] = req.body[field];
     }
   });
+
+  // Handle location update separately to validate GeoJSON structure
+  if (req.body.location?.coordinates && Array.isArray(req.body.location.coordinates) && req.body.location.coordinates.length === 2) {
+    property.location = { type: 'Point', coordinates: req.body.location.coordinates };
+  }
 
   const updated = await property.save();
 

@@ -9,6 +9,8 @@ import Loader from '../components/Loader';
 import { fetchPropertyById } from '../services/propertyService';
 import { createBooking } from '../services/bookingService';
 import { createPaymentOrder, verifyPayment } from '../services/paymentService';
+import PropertyMap from '../components/PropertyMap';
+import { geoJsonToLatLng } from '../services/mapsService';
 import { openRazorpayCheckout } from '../utils/razorpayCheckout';
 import { formatPrice, FEATURED_PROPERTIES } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
@@ -476,6 +478,30 @@ const PropertyDetails = () => {
               </div>
             </div>
           )}
+
+          {/* Location map */}
+          {(() => {
+            const coords = geoJsonToLatLng(property.location?.coordinates);
+            return (
+              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 flex items-center gap-2 font-semibold text-secondary">
+                  <FiMapPin className="h-4 w-4 text-primary" /> Location
+                </h2>
+                <PropertyMap
+                  lat={coords?.lat}
+                  lng={coords?.lng}
+                  title={property.title}
+                  className="h-64 w-full"
+                />
+                {(fullAddr || cityLabel) && (
+                  <p className="mt-3 flex items-center gap-1.5 text-sm text-muted">
+                    <FiMapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    {fullAddr || cityLabel}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* ── Right column — Booking panel ────────────────────────────── */}
