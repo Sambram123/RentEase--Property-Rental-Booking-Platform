@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FiSearch, FiSliders, FiX } from 'react-icons/fi';
+import { FiSearch, FiSliders, FiX, FiMap, FiGrid } from 'react-icons/fi';
 import PropertyCard from '../components/PropertyCard';
+import PropertiesMapView from '../components/PropertiesMapView';
 import Loader from '../components/Loader';
 import { fetchProperties } from '../services/propertyService';
 import { FEATURED_PROPERTIES } from '../utils/constants';
@@ -38,6 +39,7 @@ const Properties = () => {
   const [filters, setFilters]       = useState(INITIAL_FILTERS);
   const [applied, setApplied]       = useState(INITIAL_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode]       = useState('grid'); // 'grid' | 'map'
 
   // ── Fetch from backend ────────────────────────────────────────────────────
   const loadProperties = useCallback(async (params) => {
@@ -95,8 +97,30 @@ const Properties = () => {
           </p>
         </div>
 
-        {/* Sort + Filter toggle */}
+        {/* View toggle + Sort + Filter */}
         <div className="flex items-center gap-3">
+          {/* Grid / Map view toggle */}
+          <div className="flex rounded-xl border border-gray-200 bg-white overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition ${
+                viewMode === 'grid' ? 'bg-primary text-white' : 'text-secondary hover:bg-gray-50'
+              }`}
+            >
+              <FiGrid className="h-4 w-4" /> Grid
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('map')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition ${
+                viewMode === 'map' ? 'bg-primary text-white' : 'text-secondary hover:bg-gray-50'
+              }`}
+            >
+              <FiMap className="h-4 w-4" /> Map
+            </button>
+          </div>
+
           <select
             name="sort"
             value={filters.sort}
@@ -284,6 +308,13 @@ const Properties = () => {
               Clear filters
             </button>
           )}
+        </div>
+      ) : viewMode === 'map' ? (
+        <div className="relative">
+          <PropertiesMapView properties={properties} className="h-[560px] w-full" />
+          <p className="mt-3 text-center text-xs text-muted">
+            Only properties with a pinned location appear on the map. Use Grid view to see all {total} listings.
+          </p>
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

@@ -11,6 +11,7 @@ import MyBookings from '../pages/MyBookings';
 import MyPayments from '../pages/MyPayments';
 import PaymentSuccess from '../pages/PaymentSuccess';
 import PaymentFailed from '../pages/PaymentFailed';
+import EditProperty from '../pages/EditProperty';
 import NotFound from '../pages/NotFound';
 import ProtectedRoute from '../components/ProtectedRoute';
 
@@ -73,6 +74,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={['owner', 'admin']}>
               <AddProperty />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="properties/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={['owner', 'admin']}>
+              <EditProperty />
             </ProtectedRoute>
           }
         />
