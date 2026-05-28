@@ -189,7 +189,7 @@ const getProperties = asyncHandler(async (req, res) => {
       limit,
       hasNextPage: page * limit < total,
       hasPrevPage: page > 1,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.max(1, Math.ceil(total / limit)),
       properties,
     },
   });
