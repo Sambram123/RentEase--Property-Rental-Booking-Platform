@@ -11,23 +11,77 @@ const VALID_TYPES = ['apartment', 'house', 'villa', 'studio', 'pg', 'commercial'
 
 // ─── Helper: build the filter query from request query params ─────────────────
 const buildFilterQuery = (query) => {
-  const filter = {};
+  const and = [];
 
-  if (query.city)        filter.city        = { $regex: query.city, $options: 'i' };
-  if (query.type)        filter.type        = query.type.toLowerCase();
-  if (query.available !== 'all') filter.availability = true; // default show available
-
-  // Price range
-  if (query.minPrice || query.maxPrice) {
-    filter.price = {};
-    if (query.minPrice) filter.price.$gte = Number(query.minPrice);
-    if (query.maxPrice) filter.price.$lte = Number(query.maxPrice);
+  // Keyword search across title/description/location fields
+  if (query.q?.trim()) {
+    const keyword = query.q.trim();
+    and.push({
+      $or: [
+        { title: { $regex: keyword, $options: 'i' } },
+        { description: { $regex: keyword, $options: 'i' } },
+        { city: { $regex: keyword, $options: 'i' } },
+        { 'address.city': { $regex: keyword, $options: 'i' } },
+        { 'address.state': { $regex: keyword, $options: 'i' } },
+        { 'address.country': { $regex: keyword, $options: 'i' } },
+        { 'address.street': { $regex: keyword, $options: 'i' } },
+      ],
+    });
   }
 
-  // Bedrooms
-  if (query.bedrooms) filter.bedrooms = { $gte: Number(query.bedrooms) };
+  if (query.city?.trim()) {
+    and.push({ city: { $regex: query.city.trim(), $options: 'i' } });
+  }
+  if (query.state?.trim()) {
+    and.push({ 'address.state': { $regex: query.state.trim(), $options: 'i' } });
+  }
+  if (query.country?.trim()) {
+    and.push({ 'address.country': { $regex: query.country.trim(), $options: 'i' } });
+  }
 
-  return filter;
+  if (query.type?.trim()) {
+    and.push({ type: query.type.toLowerCase() });
+  }
+
+  if (query.minPrice || query.maxPrice) {
+    const price = {};
+    if (query.minPrice) price.$gte = Number(query.minPrice);
+    if (query.maxPrice) price.$lte = Number(query.maxPrice);
+    and.push({ price });
+  }
+
+  if (query.bedrooms) {
+    and.push({ bedrooms: { $gte: Number(query.bedrooms) } });
+  }
+  if (query.bathrooms) {
+    and.push({ bathrooms: { $gte: Number(query.bathrooms) } });
+  }
+
+  // amenities can be CSV or repeated query key
+  if (query.amenities) {
+    const amenitiesInput = Array.isArray(query.amenities)
+      ? query.amenities
+      : String(query.amenities).split(',');
+    const amenities = amenitiesInput
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .filter((a) => VALID_AMENITIES.includes(a));
+
+    if (amenities.length) {
+      and.push({ amenities: { $all: amenities } });
+    }
+  }
+
+  // default: available only, unless explicit all
+  if (query.availability === 'all') {
+    // no-op
+  } else if (query.availability === 'false') {
+    and.push({ availability: false });
+  } else {
+    and.push({ availability: true });
+  }
+
+  return and.length ? { $and: and } : {};
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -132,6 +186,9 @@ const getProperties = asyncHandler(async (req, res) => {
       count:      properties.length,
       total,
       page,
+      limit,
+      hasNextPage: page * limit < total,
+      hasPrevPage: page > 1,
       totalPages: Math.ceil(total / limit),
       properties,
     },
