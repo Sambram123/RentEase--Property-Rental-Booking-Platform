@@ -134,6 +134,7 @@ propertySchema.pre('save', function (next) {
 propertySchema.index({ city: 1 });
 propertySchema.index({ type: 1 });
 propertySchema.index({ price: 1 });
+propertySchema.index({ title: 1 });
 propertySchema.index({ owner: 1 });
 propertySchema.index({ availability: 1 });
 propertySchema.index({ location: '2dsphere' }); // for geospatial queries
