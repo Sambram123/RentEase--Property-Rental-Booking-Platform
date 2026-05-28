@@ -177,6 +177,15 @@ const Properties = () => {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+          <select
+            value={query.limit}
+            onChange={(e) => updateParams({ limit: Number(e.target.value), page: 1 }, false)}
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+          >
+            <option value={12}>12 / page</option>
+            <option value={24}>24 / page</option>
+            <option value={36}>36 / page</option>
+          </select>
 
           <button
             type="button"
