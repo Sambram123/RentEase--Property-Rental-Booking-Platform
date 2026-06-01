@@ -50,6 +50,11 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    wishlist: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Property',
+    }],
   },
   {
     timestamps: true,

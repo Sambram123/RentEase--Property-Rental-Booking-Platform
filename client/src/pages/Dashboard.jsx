@@ -4,6 +4,7 @@ import {
   FiCalendar, FiHome, FiPlus, FiEdit2, FiTrash2,
   FiEye, FiToggleLeft, FiToggleRight, FiCheckCircle,
   FiXCircle, FiClock, FiUser, FiCreditCard, FiDollarSign,
+  FiHeart,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +12,7 @@ import Loader from '../components/Loader';
 import { fetchMyProperties, deleteProperty } from '../services/propertyService';
 import { fetchOwnerBookings, updateBookingStatus } from '../services/bookingService';
 import { fetchOwnerPayments } from '../services/paymentService';
+import { fetchWishlist } from '../services/wishlistService';
 import { formatPrice } from '../utils/constants';
 
 const PLACEHOLDER =
@@ -79,6 +81,18 @@ const Dashboard = () => {
   const [deletingId,    setDeletingId]    = useState(null);
   const [updatingBk,    setUpdatingBk]    = useState(null);
   const [bookingFilter, setBookingFilter] = useState('all');
+  const [savedCount,    setSavedCount]    = useState(0);
+
+  // ── Load wishlist count ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const result = await fetchWishlist();
+        setSavedCount(result.count || 0);
+      } catch { /* silently skip */ }
+    };
+    load();
+  }, []);
 
   // ── Load owner properties ─────────────────────────────────────────────────
   useEffect(() => {
@@ -214,7 +228,9 @@ const Dashboard = () => {
       {/* ── Stats row ──────────────────────────────────────────────────── */}
       <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={FiCalendar} label="My bookings" value={0} />
-        <StatCard icon={FiHome}     label="Saved properties" value={0} />
+        <Link to="/wishlist">
+          <StatCard icon={FiHeart} label="Saved properties" value={savedCount} color="text-primary" />
+        </Link>
         {isOwnerOrAdmin && (
           <>
             <StatCard icon={FiHome}        label="My listings"    value={myProperties.length} />
@@ -239,6 +255,12 @@ const Dashboard = () => {
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark"
             >
               Browse properties
+            </Link>
+            <Link
+              to="/wishlist"
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-6 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
+            >
+              <FiHeart className="h-4 w-4" /> Saved properties
             </Link>
             <Link
               to="/my-payments"

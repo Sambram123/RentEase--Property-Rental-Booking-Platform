@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { HiMenu, HiX } from 'react-icons/hi';
-import { FiHome, FiLogOut, FiUser } from 'react-icons/fi';
+import { FiHome, FiLogOut, FiUser, FiHeart } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
@@ -60,6 +60,9 @@ const Navbar = () => {
             <>
               <NavLink to="/dashboard" className={linkClass}>
                 Dashboard
+              </NavLink>
+              <NavLink to="/wishlist" className={linkClass}>
+                <span className="flex items-center gap-1"><FiHeart className="h-3.5 w-3.5" /> Wishlist</span>
               </NavLink>
               <NavLink to="/my-payments" className={linkClass}>
                 Payments
@@ -156,6 +159,13 @@ const Navbar = () => {
                   onClick={() => setMenuOpen(false)}
                 >
                   Dashboard
+                </NavLink>
+                <NavLink
+                  to="/wishlist"
+                  className={linkClass}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <span className="flex items-center gap-1"><FiHeart className="h-3.5 w-3.5" /> Wishlist</span>
                 </NavLink>
                 <NavLink
                   to="/my-payments"

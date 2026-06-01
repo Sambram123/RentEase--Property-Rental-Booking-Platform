@@ -38,6 +38,9 @@ const PropertyCard = ({ property }) => {
           <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-xs font-medium shadow-sm">
             <FiStar className="h-3 w-3 fill-primary text-primary" />
             {Number(rating).toFixed(1)}
+            {property.reviewsCount > 0 && (
+              <span className="text-muted">({property.reviewsCount})</span>
+            )}
           </span>
         )}
         {/* Availability badge */}

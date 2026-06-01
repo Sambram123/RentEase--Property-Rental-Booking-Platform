@@ -12,6 +12,7 @@ import MyPayments from '../pages/MyPayments';
 import PaymentSuccess from '../pages/PaymentSuccess';
 import PaymentFailed from '../pages/PaymentFailed';
 import EditProperty from '../pages/EditProperty';
+import Wishlist from '../pages/Wishlist';
 import NotFound from '../pages/NotFound';
 import ProtectedRoute from '../components/ProtectedRoute';
 
@@ -64,6 +65,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <PaymentFailed />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="wishlist"
+          element={
+            <ProtectedRoute>
+              <Wishlist />
             </ProtectedRoute>
           }
         />
