@@ -2,6 +2,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import Review from '../models/Review.js';
 import Property from '../models/Property.js';
 import Booking from '../models/Booking.js';
+import { notifyReviewAdded } from '../socket/socketEvents.js';
 
 // ─── Helper: recalculate property rating ──────────────────────────────────────
 const refreshPropertyRating = async (propertyId) => {
@@ -78,6 +79,16 @@ const createReview = asyncHandler(async (req, res) => {
   await refreshPropertyRating(property._id);
 
   const populated = await review.populate('user', 'name avatar');
+
+  // ── Notify property owner ───────────────────────────────────────────────
+  const io = req.app.get('io');
+  if (io) {
+    notifyReviewAdded(io, {
+      review,
+      reviewer: req.user,
+      property,
+    });
+  }
 
   res.status(201).json({
     success: true,

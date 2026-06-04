@@ -4,6 +4,8 @@ import { razorpay, keyId } from '../utils/razorpay.js';
 import Booking from '../models/Booking.js';
 import Payment from '../models/Payment.js';
 import Property from '../models/Property.js';
+import User from '../models/User.js';
+import { notifyPaymentSuccess, notifyPaymentFailed } from '../socket/socketEvents.js';
 
 // Advance = 30% of total rent, minimum ₹100
 const ADVANCE_PERCENT = 0.3;
@@ -153,6 +155,19 @@ const verifyPayment = asyncHandler(async (req, res) => {
       { paymentStatus: 'failed', razorpayPaymentId: razorpay_payment_id }
     );
 
+    // ── Notify tenant of failed payment ──────────────────────────────────────
+    const io = req.app.get('io');
+    if (io) {
+      const fullProperty = await Property.findById(booking.property);
+      if (fullProperty) {
+        notifyPaymentFailed(io, {
+          booking,
+          tenant: req.user,
+          property: fullProperty,
+        });
+      }
+    }
+
     res.status(400);
     throw new Error('Payment verification failed — invalid signature');
   }
@@ -181,6 +196,20 @@ const verifyPayment = asyncHandler(async (req, res) => {
   const populatedPayment = await Payment.findById(payment._id)
     .populate('booking', 'checkInDate checkOutDate totalAmount bookingStatus paymentStatus')
     .populate('property', 'title city images');
+
+  // ── Notify both tenant and owner of successful payment ────────────────
+  const io = req.app.get('io');
+  if (io) {
+    const fullProperty = await Property.findById(payment.property);
+    if (fullProperty) {
+      notifyPaymentSuccess(io, {
+        payment,
+        booking,
+        tenant: req.user,
+        property: fullProperty,
+      });
+    }
+  }
 
   res.status(200).json({
     success: true,

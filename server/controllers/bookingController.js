@@ -1,6 +1,11 @@
 import asyncHandler from '../utils/asyncHandler.js';
 import Booking from '../models/Booking.js';
 import Property from '../models/Property.js';
+import {
+  notifyBookingCreated,
+  notifyBookingConfirmed,
+  notifyBookingCancelled,
+} from '../socket/socketEvents.js';
 
 // ─── Helper: calculate total rent in months ────────────────────────────────────
 const calcTotalAmount = (pricePerMonth, checkIn, checkOut) => {
@@ -98,6 +103,16 @@ const createBooking = asyncHandler(async (req, res) => {
     { path: 'property', select: 'title city price images' },
     { path: 'user',     select: 'name email' },
   ]);
+
+  // ── Real-time notification to owner ─────────────────────────────────────
+  const io = req.app.get('io');
+  if (io) {
+    notifyBookingCreated(io, {
+      booking,
+      tenant: req.user,
+      property,
+    });
+  }
 
   res.status(201).json({
     success: true,
@@ -234,6 +249,30 @@ const updateBookingStatus = asyncHandler(async (req, res) => {
 
   booking.bookingStatus = status;
   await booking.save();
+
+  // ── Real-time notifications ───────────────────────────────────────────────
+  const io = req.app.get('io');
+  if (io) {
+    const fullProperty = await Property.findById(booking.property._id || booking.property);
+    if (status === 'confirmed' && fullProperty) {
+      notifyBookingConfirmed(io, {
+        booking,
+        property: fullProperty,
+        tenantId: booking.user,
+      });
+    } else if (status === 'cancelled' && fullProperty) {
+      // Notify the other party (if owner cancels → notify tenant, if tenant cancels → notify owner)
+      const recipientId = isBookingUser
+        ? fullProperty.owner.toString()
+        : booking.user.toString();
+      notifyBookingCancelled(io, {
+        booking,
+        property: fullProperty,
+        cancelledBy: req.user._id,
+        recipientId,
+      });
+    }
+  }
 
   res.status(200).json({
     success: true,
