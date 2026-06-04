@@ -13,6 +13,7 @@ import PaymentSuccess from '../pages/PaymentSuccess';
 import PaymentFailed from '../pages/PaymentFailed';
 import EditProperty from '../pages/EditProperty';
 import Wishlist from '../pages/Wishlist';
+import Notifications from '../pages/Notifications';
 import NotFound from '../pages/NotFound';
 import ProtectedRoute from '../components/ProtectedRoute';
 
@@ -73,6 +74,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <Wishlist />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="notifications"
+          element={
+            <ProtectedRoute>
+              <Notifications />
             </ProtectedRoute>
           }
         />

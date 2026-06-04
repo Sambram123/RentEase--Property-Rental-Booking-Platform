@@ -4,7 +4,7 @@ import {
   FiCalendar, FiHome, FiPlus, FiEdit2, FiTrash2,
   FiEye, FiToggleLeft, FiToggleRight, FiCheckCircle,
   FiXCircle, FiClock, FiUser, FiCreditCard, FiDollarSign,
-  FiHeart,
+  FiHeart, FiBell,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ import { fetchOwnerBookings, updateBookingStatus } from '../services/bookingServ
 import { fetchOwnerPayments } from '../services/paymentService';
 import { fetchWishlist } from '../services/wishlistService';
 import { formatPrice } from '../utils/constants';
+import ActivityFeed from '../components/ActivityFeed';
 
 const PLACEHOLDER =
   'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
@@ -222,6 +223,12 @@ const Dashboard = () => {
               <FiPlus className="h-4 w-4" /> Add property
             </Link>
           )}
+          <Link
+            to="/notifications"
+            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
+          >
+            <FiBell className="h-4 w-4" /> Notifications
+          </Link>
         </div>
       </div>
 
@@ -243,33 +250,38 @@ const Dashboard = () => {
 
       {/* ── Tenant: browse CTA ─────────────────────────────────────────── */}
       {!isOwnerOrAdmin && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-sm">
-          <span className="text-5xl">🏡</span>
-          <h2 className="mt-4 text-lg font-semibold text-secondary">Start your search</h2>
-          <p className="mt-2 text-sm text-muted">
-            Browse hundreds of verified rental properties across India.
-          </p>
-          <div className="mt-5 flex flex-wrap justify-center gap-3">
-            <Link
-              to="/properties"
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark"
-            >
-              Browse properties
-            </Link>
-            <Link
-              to="/wishlist"
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-6 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
-            >
-              <FiHeart className="h-4 w-4" /> Saved properties
-            </Link>
-            <Link
-              to="/my-payments"
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-6 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
-            >
-              <FiCreditCard className="h-4 w-4" /> Payment history
-            </Link>
+        <>
+          <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-sm">
+            <span className="text-5xl">🏡</span>
+            <h2 className="mt-4 text-lg font-semibold text-secondary">Start your search</h2>
+            <p className="mt-2 text-sm text-muted">
+              Browse hundreds of verified rental properties across India.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              <Link
+                to="/properties"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark"
+              >
+                Browse properties
+              </Link>
+              <Link
+                to="/wishlist"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-6 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
+              >
+                <FiHeart className="h-4 w-4" /> Saved properties
+              </Link>
+              <Link
+                to="/my-payments"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-6 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
+              >
+                <FiCreditCard className="h-4 w-4" /> Payment history
+              </Link>
+            </div>
           </div>
-        </div>
+          <div className="mt-8">
+            <ActivityFeed maxItems={5} />
+          </div>
+        </>
       )}
 
       {/* ── Owner sections ─────────────────────────────────────────────── */}
@@ -485,6 +497,11 @@ const Dashboard = () => {
                 })}
               </div>
             )}
+          </section>
+
+          {/* ── Activity Feed ───────────────────────────────────── */}
+          <section className="mt-8">
+            <ActivityFeed maxItems={6} />
           </section>
         </>
       )}
