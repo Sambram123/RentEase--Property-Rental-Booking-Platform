@@ -1,28 +1,46 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  FiCalendar, FiHome, FiPlus, FiEdit2, FiTrash2,
-  FiEye, FiToggleLeft, FiToggleRight, FiCheckCircle,
-  FiXCircle, FiClock, FiUser, FiCreditCard, FiDollarSign,
-  FiHeart, FiBell,
+  FiCalendar, FiHome, FiHeart, FiCreditCard, FiDollarSign,
+  FiBell, FiCheckCircle, FiXCircle, FiClock, FiSearch,
+  FiArrowRight, FiTrendingUp,
 } from 'react-icons/fi';
-import toast from 'react-hot-toast';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
+} from 'recharts';
 import { useAuth } from '../context/AuthContext';
-import Loader from '../components/Loader';
-import { fetchMyProperties, deleteProperty } from '../services/propertyService';
-import { fetchOwnerBookings, updateBookingStatus } from '../services/bookingService';
-import { fetchOwnerPayments } from '../services/paymentService';
-import { fetchWishlist } from '../services/wishlistService';
+import { fetchTenantDashboard } from '../services/dashboardService';
 import { formatPrice } from '../utils/constants';
 import ActivityFeed from '../components/ActivityFeed';
 
-const PLACEHOLDER =
-  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
+// ─── Skeleton loader ──────────────────────────────────────────────────────────
+const SkeletonCard = () => (
+  <div className="animate-pulse rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+    <div className="flex items-center gap-4">
+      <div className="h-12 w-12 rounded-xl bg-gray-100" />
+      <div className="flex-1 space-y-2">
+        <div className="h-5 w-16 rounded bg-gray-100" />
+        <div className="h-3 w-24 rounded bg-gray-100" />
+      </div>
+    </div>
+  </div>
+);
+
+const SkeletonRow = () => (
+  <div className="animate-pulse flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+    <div className="h-14 w-20 rounded-xl bg-gray-100" />
+    <div className="flex-1 space-y-2">
+      <div className="h-4 w-40 rounded bg-gray-100" />
+      <div className="h-3 w-56 rounded bg-gray-100" />
+    </div>
+  </div>
+);
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
-const StatCard = ({ icon: Icon, label, value, color = 'text-primary' }) => (
-  <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-    <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 ${color}`}>
+const StatCard = ({ icon: Icon, label, value, color = 'bg-primary/10 text-primary', className = '' }) => (
+  <div className={`flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md ${className}`}>
+    <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${color}`}>
       <Icon className="h-6 w-6" />
     </div>
     <div>
@@ -32,7 +50,7 @@ const StatCard = ({ icon: Icon, label, value, color = 'text-primary' }) => (
   </div>
 );
 
-// ─── Booking status badge ─────────────────────────────────────────────────────
+// ─── Status badge ─────────────────────────────────────────────────────────────
 const STATUS = {
   pending:   { cls: 'bg-amber-50 text-amber-600',  icon: FiClock,        label: 'Pending'   },
   confirmed: { cls: 'bg-green-50 text-green-600',   icon: FiCheckCircle, label: 'Confirmed' },
@@ -50,179 +68,75 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const PAYMENT_STATUS = {
-  pending: { cls: 'bg-amber-50 text-amber-600', label: 'Payment pending' },
-  paid:    { cls: 'bg-green-50 text-green-600',  label: 'Paid' },
-  failed:  { cls: 'bg-red-50 text-red-500',     label: 'Payment failed' },
-};
-
-const PaymentBadge = ({ status }) => {
-  const s = PAYMENT_STATUS[status] || PAYMENT_STATUS.pending;
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${s.cls}`}>
-      <FiCreditCard className="h-3 w-3" /> {s.label}
-    </span>
-  );
-};
+const PLACEHOLDER = 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 const fmtDate = (d) =>
   new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
+// ─── Tenant Dashboard ────────────────────────────────────────────────────────
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isOwnerOrAdmin = ['owner', 'admin'].includes(user?.role);
 
-  const [myProperties,  setMyProperties]  = useState([]);
-  const [ownerBookings, setOwnerBookings] = useState([]);
-  const [ownerRevenue,  setOwnerRevenue]  = useState(0);
-  const [paidCount,     setPaidCount]     = useState(0);
-  const [loadingProps,  setLoadingProps]  = useState(false);
-  const [loadingBks,    setLoadingBks]    = useState(false);
-  const [deletingId,    setDeletingId]    = useState(null);
-  const [updatingBk,    setUpdatingBk]    = useState(null);
-  const [bookingFilter, setBookingFilter] = useState('all');
-  const [savedCount,    setSavedCount]    = useState(0);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // ── Load wishlist count ─────────────────────────────────────────────────────────
+  // Redirect owner/admin to /owner/dashboard
   useEffect(() => {
+    if (isOwnerOrAdmin) {
+      navigate('/owner/dashboard', { replace: true });
+    }
+  }, [isOwnerOrAdmin, navigate]);
+
+  useEffect(() => {
+    if (isOwnerOrAdmin) return;
     const load = async () => {
       try {
-        const result = await fetchWishlist();
-        setSavedCount(result.count || 0);
-      } catch { /* silently skip */ }
-    };
-    load();
-  }, []);
-
-  // ── Load owner properties ─────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isOwnerOrAdmin) return;
-    const load = async () => {
-      setLoadingProps(true);
-      try {
-        const result = await fetchMyProperties();
-        setMyProperties(result.properties);
+        const result = await fetchTenantDashboard();
+        setData(result);
       } catch {
         // silently skip
       } finally {
-        setLoadingProps(false);
+        setLoading(false);
       }
     };
     load();
   }, [isOwnerOrAdmin]);
 
-  // ── Load owner bookings ───────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isOwnerOrAdmin) return;
-    const load = async () => {
-      setLoadingBks(true);
-      try {
-        const result = await fetchOwnerBookings();
-        setOwnerBookings(result.bookings);
-      } catch {
-        // silently skip
-      } finally {
-        setLoadingBks(false);
-      }
-    };
-    load();
-  }, [isOwnerOrAdmin]);
+  if (isOwnerOrAdmin) return null;
 
-  // ── Load owner payment revenue ────────────────────────────────────────────
-  useEffect(() => {
-    if (!isOwnerOrAdmin) return;
-    const load = async () => {
-      try {
-        const result = await fetchOwnerPayments();
-        setOwnerRevenue(result.totalRevenue || 0);
-        setPaidCount(result.count || 0);
-      } catch {
-        // silently skip
-      }
-    };
-    load();
-  }, [isOwnerOrAdmin]);
+  const stats = data?.stats || {};
+  const recentBookings = data?.recentBookings || [];
+  const recentPayments = data?.recentPayments || [];
 
-  // ── Delete property ───────────────────────────────────────────────────────
-  const handleDeleteProperty = async (id, title) => {
-    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
-    setDeletingId(id);
-    try {
-      await deleteProperty(id);
-      setMyProperties((prev) => prev.filter((p) => p._id !== id));
-      toast.success('Property deleted');
-    } catch (err) {
-      toast.error(err.message || 'Failed to delete property');
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  // ── Update booking status ─────────────────────────────────────────────────
-  const handleBookingStatus = async (bookingId, newStatus) => {
-    setUpdatingBk(bookingId);
-    try {
-      await updateBookingStatus(bookingId, newStatus);
-      setOwnerBookings((prev) =>
-        prev.map((b) => b._id === bookingId ? { ...b, bookingStatus: newStatus } : b)
-      );
-      toast.success(`Booking ${newStatus}`);
-    } catch (err) {
-      toast.error(err.message || 'Failed to update booking');
-    } finally {
-      setUpdatingBk(null);
-    }
-  };
-
-  const activeCount   = myProperties.filter((p) => p.availability).length;
-  const pendingCount  = ownerBookings.filter((b) => b.bookingStatus === 'pending').length;
-
-  const BOOKING_TABS = [
-    { key: 'all',       label: 'All' },
-    { key: 'pending',   label: 'Pending' },
-    { key: 'confirmed', label: 'Confirmed' },
-    { key: 'completed', label: 'Completed' },
-    { key: 'cancelled', label: 'Cancelled' },
-  ];
-  const visibleBookings = bookingFilter === 'all'
-    ? ownerBookings
-    : ownerBookings.filter((b) => b.bookingStatus === bookingFilter);
+  // Format booking trend for chart
+  const chartData = (data?.bookingTrend || []).map((item) => ({
+    name: MONTHS[(item._id.month - 1) % 12],
+    bookings: item.count,
+  }));
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
 
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-secondary">
             Welcome back, {user?.name?.split(' ')[0]} 👋
           </h1>
           <p className="mt-1 text-sm text-muted capitalize">
-            {user?.role} account
+            {user?.role} account • Dashboard overview
           </p>
         </div>
         <div className="flex items-center gap-3 self-start">
           <Link
-            to="/my-bookings"
-            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
+            to="/properties"
+            className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark"
           >
-            <FiCalendar className="h-4 w-4" /> My bookings
+            <FiSearch className="h-4 w-4" /> Browse properties
           </Link>
-          <Link
-            to="/my-payments"
-            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
-          >
-            <FiCreditCard className="h-4 w-4" /> Payments
-          </Link>
-          {isOwnerOrAdmin && (
-            <Link
-              to="/properties/add"
-              className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark"
-            >
-              <FiPlus className="h-4 w-4" /> Add property
-            </Link>
-          )}
           <Link
             to="/notifications"
             className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
@@ -232,280 +146,202 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ── Stats row ──────────────────────────────────────────────────── */}
-      <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={FiCalendar} label="My bookings" value={0} />
-        <Link to="/wishlist">
-          <StatCard icon={FiHeart} label="Saved properties" value={savedCount} color="text-primary" />
-        </Link>
-        {isOwnerOrAdmin && (
-          <>
-            <StatCard icon={FiHome}        label="My listings"    value={myProperties.length} />
-            <StatCard icon={FiToggleRight} label="Active listings" value={activeCount} />
-            <StatCard icon={FiDollarSign}  label="Advance received" value={formatPrice(ownerRevenue)} color="text-green-600" />
-            <StatCard icon={FiCreditCard}  label="Paid bookings"  value={paidCount} />
-          </>
-        )}
-      </div>
+      {/* ── Stats row ──────────────────────────────────────────────── */}
+      {loading ? (
+        <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      ) : (
+        <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard icon={FiCalendar} label="Total bookings" value={stats.totalBookings || 0} />
+          <StatCard icon={FiCheckCircle} label="Active bookings" value={stats.activeBookings || 0} color="bg-green-50 text-green-600" />
+          <StatCard icon={FiTrendingUp} label="Completed" value={stats.completedBookings || 0} color="bg-blue-50 text-blue-600" />
+          <StatCard icon={FiXCircle} label="Cancelled" value={stats.cancelledBookings || 0} color="bg-red-50 text-red-500" />
+        </div>
+      )}
 
-      {/* ── Tenant: browse CTA ─────────────────────────────────────────── */}
-      {!isOwnerOrAdmin && (
-        <>
-          <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-sm">
-            <span className="text-5xl">🏡</span>
-            <h2 className="mt-4 text-lg font-semibold text-secondary">Start your search</h2>
-            <p className="mt-2 text-sm text-muted">
-              Browse hundreds of verified rental properties across India.
-            </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-3">
+      {/* ── Booking Trend Chart ─────────────────────────────────────── */}
+      {!loading && chartData.length > 0 && (
+        <section className="mb-10 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-lg font-bold text-secondary">Booking History</h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="colorBookings" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ff385c" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#ff385c" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#717171' }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#717171' }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '12px', border: '1px solid #f0f0f0', fontSize: '13px' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="bookings"
+                  stroke="#ff385c"
+                  strokeWidth={2}
+                  fill="url(#colorBookings)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      )}
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* ── Recent Bookings ──────────────────────────────────────── */}
+        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-secondary">Recent Bookings</h2>
+            <Link
+              to="/my-bookings"
+              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark"
+            >
+              View all <FiArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)}
+            </div>
+          ) : recentBookings.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-center">
+              <FiCalendar className="h-10 w-10 text-gray-200" />
+              <p className="mt-3 text-sm font-medium text-secondary">No bookings yet</p>
               <Link
                 to="/properties"
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark"
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
               >
                 Browse properties
               </Link>
-              <Link
-                to="/wishlist"
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-6 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
-              >
-                <FiHeart className="h-4 w-4" /> Saved properties
-              </Link>
-              <Link
-                to="/my-payments"
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-6 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
-              >
-                <FiCreditCard className="h-4 w-4" /> Payment history
-              </Link>
             </div>
-          </div>
-          <div className="mt-8">
-            <ActivityFeed maxItems={5} />
-          </div>
-        </>
-      )}
-
-      {/* ── Owner sections ─────────────────────────────────────────────── */}
-      {isOwnerOrAdmin && (
-        <>
-          {/* ── Booking requests ─────────────────────────────────────── */}
-          <section className="mb-12">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold text-secondary">Booking requests</h2>
-                {pendingCount > 0 && (
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                    {pendingCount}
-                  </span>
-                )}
-              </div>
-              {/* Filter tabs */}
-              <div className="flex flex-wrap gap-2">
-                {BOOKING_TABS.map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setBookingFilter(tab.key)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                      bookingFilter === tab.key
-                        ? 'bg-primary text-white'
-                        : 'border border-gray-200 bg-white text-secondary hover:bg-gray-50'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {loadingBks ? (
-              <div className="flex h-32 items-center justify-center">
-                <Loader />
-              </div>
-            ) : visibleBookings.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 p-8 text-center">
-                <FiCalendar className="mx-auto h-10 w-10 text-gray-200" />
-                <p className="mt-3 text-sm font-medium text-secondary">
-                  No {bookingFilter === 'all' ? '' : bookingFilter} bookings yet
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {visibleBookings.map((bk) => {
-                  const prop  = bk.property  || {};
-                  const guest = bk.user      || {};
-                  const img   = (Array.isArray(prop.images) && prop.images[0]) || PLACEHOLDER;
-                  return (
-                    <div
-                      key={bk._id}
-                      className="flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center"
-                    >
-                      {/* Property thumb */}
-                      <img
-                        src={img}
-                        alt={prop.title}
-                        className="h-16 w-24 shrink-0 rounded-xl object-cover"
-                        onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
-                      />
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <p className="line-clamp-1 font-semibold text-secondary">{prop.title}</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            <StatusBadge status={bk.bookingStatus} />
-                            <PaymentBadge status={bk.paymentStatus} />
-                          </div>
-                        </div>
-                        <div className="mt-1.5 flex flex-wrap gap-4 text-xs text-muted">
-                          <span className="flex items-center gap-1">
-                            <FiUser className="h-3 w-3" /> {guest.name || 'Guest'} · {guest.email}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <FiCalendar className="h-3 w-3" />
-                            {fmtDate(bk.checkInDate)} → {fmtDate(bk.checkOutDate)}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm font-semibold text-secondary">
-                          {formatPrice(bk.totalAmount)}
-                          {bk.paymentStatus === 'paid' && bk.advancePaid > 0 && (
-                            <span className="ml-2 text-xs font-normal text-green-600">
-                              · {formatPrice(bk.advancePaid)} advance received
-                            </span>
-                          )}
-                        </p>
-                      </div>
-
-                      {/* Actions — only for pending bookings */}
-                      {bk.bookingStatus === 'pending' && (
-                        <div className="flex shrink-0 gap-2">
-                          <button
-                            type="button"
-                            disabled={updatingBk === bk._id}
-                            onClick={() => handleBookingStatus(bk._id, 'confirmed')}
-                            className="flex items-center gap-1.5 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700 transition hover:bg-green-100 disabled:opacity-50"
-                          >
-                            <FiCheckCircle className="h-3.5 w-3.5" /> Confirm
-                          </button>
-                          <button
-                            type="button"
-                            disabled={updatingBk === bk._id}
-                            onClick={() => handleBookingStatus(bk._id, 'cancelled')}
-                            className="flex items-center gap-1.5 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
-                          >
-                            <FiXCircle className="h-3.5 w-3.5" /> Decline
-                          </button>
-                        </div>
-                      )}
-                      {/* Mark completed if confirmed */}
-                      {bk.bookingStatus === 'confirmed' && (
-                        <button
-                          type="button"
-                          disabled={updatingBk === bk._id}
-                          onClick={() => handleBookingStatus(bk._id, 'completed')}
-                          className="shrink-0 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-100 disabled:opacity-50"
-                        >
-                          Mark complete
-                        </button>
-                      )}
+          ) : (
+            <div className="space-y-3">
+              {recentBookings.map((bk) => {
+                const prop = bk.property || {};
+                const img = (Array.isArray(prop.images) && prop.images[0]) || PLACEHOLDER;
+                return (
+                  <div key={bk._id} className="flex items-center gap-4 rounded-xl border border-gray-50 bg-gray-50/30 p-3 transition hover:bg-gray-50">
+                    <img
+                      src={img}
+                      alt={prop.title}
+                      className="h-14 w-20 shrink-0 rounded-lg object-cover"
+                      onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 text-sm font-semibold text-secondary">{prop.title}</p>
+                      <p className="text-xs text-muted">
+                        {fmtDate(bk.checkInDate)} → {fmtDate(bk.checkOutDate)}
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* ── My properties ────────────────────────────────────────── */}
-          <section>
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-secondary">My properties</h2>
-              <Link
-                to="/properties/add"
-                className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-dark"
-              >
-                <FiPlus className="h-4 w-4" /> Add new
-              </Link>
+                    <StatusBadge status={bk.bookingStatus} />
+                  </div>
+                );
+              })}
             </div>
+          )}
+        </section>
 
-            {loadingProps ? (
-              <div className="flex h-40 items-center justify-center"><Loader /></div>
-            ) : myProperties.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 p-10 text-center">
-                <span className="text-4xl">🏘️</span>
-                <p className="mt-3 font-medium text-secondary">No properties listed yet</p>
-                <Link
-                  to="/properties/add"
-                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark"
-                >
-                  <FiPlus className="h-4 w-4" /> Add property
-                </Link>
-              </div>
-            ) : (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {myProperties.map((prop) => {
-                  const image = (Array.isArray(prop.images) && prop.images[0]) || PLACEHOLDER;
-                  return (
-                    <div key={prop._id} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                      <div className="relative aspect-[16/9]">
-                        <img
-                          src={image}
-                          alt={prop.title}
-                          className="h-full w-full object-cover"
-                          onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
-                        />
-                        <span className={`absolute left-3 top-3 flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
-                          prop.availability ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
-                        }`}>
-                          {prop.availability ? <FiToggleRight className="h-3.5 w-3.5" /> : <FiToggleLeft className="h-3.5 w-3.5" />}
-                          {prop.availability ? 'Available' : 'Unlisted'}
-                        </span>
-                      </div>
-                      <div className="p-4">
-                        <p className="line-clamp-1 font-semibold text-secondary">{prop.title}</p>
-                        <p className="mt-1 text-sm text-muted">
-                          {prop.city || prop.address?.city} · {prop.bedrooms}bed / {prop.bathrooms}bath
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-secondary">
-                          {formatPrice(prop.price)}<span className="text-xs font-normal text-muted">/mo</span>
-                        </p>
-                        <div className="mt-3 flex items-center gap-2">
-                          <Link
-                            to={`/properties/${prop._id}`}
-                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2 text-xs font-medium text-secondary transition hover:bg-gray-50"
-                          >
-                            <FiEye className="h-3.5 w-3.5" /> View
-                          </Link>
-                          <Link
-                            to={`/properties/${prop._id}/edit`}
-                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2 text-xs font-medium text-secondary transition hover:bg-gray-50"
-                          >
-                            <FiEdit2 className="h-3.5 w-3.5" /> Edit
-                          </Link>
-                          <button
-                            type="button"
-                            disabled={deletingId === prop._id}
-                            onClick={() => handleDeleteProperty(prop._id, prop.title)}
-                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-100 py-2 text-xs font-medium text-red-500 transition hover:bg-red-50 disabled:opacity-50"
-                          >
-                            {deletingId === prop._id
-                              ? <span className="h-3 w-3 animate-spin rounded-full border border-red-300 border-t-red-500" />
-                              : <FiTrash2 className="h-3.5 w-3.5" />}
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+        {/* ── Recent Payments ─────────────────────────────────────── */}
+        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-secondary">Recent Payments</h2>
+            <Link
+              to="/my-payments"
+              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark"
+            >
+              View all <FiArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)}
+            </div>
+          ) : recentPayments.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-center">
+              <FiCreditCard className="h-10 w-10 text-gray-200" />
+              <p className="mt-3 text-sm font-medium text-secondary">No payments yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentPayments.map((pmt) => (
+                <div key={pmt._id} className="flex items-center justify-between rounded-xl border border-gray-50 bg-gray-50/30 p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-1 text-sm font-semibold text-secondary">
+                      {pmt.property?.title || 'Property'}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {pmt.transactionDate ? fmtDate(pmt.transactionDate) : fmtDate(pmt.createdAt)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-secondary">{formatPrice(pmt.amount)}</p>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      pmt.paymentStatus === 'success' ? 'bg-green-50 text-green-600' :
+                      pmt.paymentStatus === 'failed' ? 'bg-red-50 text-red-500' :
+                      'bg-amber-50 text-amber-600'
+                    }`}>
+                      {pmt.paymentStatus === 'success' ? 'Paid' : pmt.paymentStatus === 'failed' ? 'Failed' : 'Pending'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
 
-          {/* ── Activity Feed ───────────────────────────────────── */}
-          <section className="mt-8">
-            <ActivityFeed maxItems={6} />
-          </section>
-        </>
-      )}
+      {/* ── Quick Actions ──────────────────────────────────────────── */}
+      <section className="mt-10 grid gap-4 sm:grid-cols-3">
+        <Link
+          to="/properties"
+          className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:border-primary/20 hover:shadow-md"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-white">
+            <FiSearch className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="font-semibold text-secondary">Browse Properties</p>
+            <p className="text-xs text-muted">Find your next home</p>
+          </div>
+          <FiArrowRight className="ml-auto h-4 w-4 text-muted opacity-0 transition group-hover:opacity-100" />
+        </Link>
+        <Link
+          to="/my-bookings"
+          className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:border-primary/20 hover:shadow-md"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition group-hover:bg-blue-600 group-hover:text-white">
+            <FiCalendar className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="font-semibold text-secondary">My Bookings</p>
+            <p className="text-xs text-muted">Manage your stays</p>
+          </div>
+          <FiArrowRight className="ml-auto h-4 w-4 text-muted opacity-0 transition group-hover:opacity-100" />
+        </Link>
+        <Link
+          to="/wishlist"
+          className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:border-primary/20 hover:shadow-md"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-500 transition group-hover:bg-red-500 group-hover:text-white">
+            <FiHeart className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="font-semibold text-secondary">Wishlist</p>
+            <p className="text-xs text-muted">Saved properties</p>
+          </div>
+          <FiArrowRight className="ml-auto h-4 w-4 text-muted opacity-0 transition group-hover:opacity-100" />
+        </Link>
+      </section>
 
+      {/* ── Activity Feed ──────────────────────────────────────────── */}
+      <section className="mt-8">
+        <ActivityFeed maxItems={5} />
+      </section>
     </div>
   );
 };

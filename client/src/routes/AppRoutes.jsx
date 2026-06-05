@@ -7,6 +7,7 @@ import Properties from '../pages/Properties';
 import PropertyDetails from '../pages/PropertyDetails';
 import AddProperty from '../pages/AddProperty';
 import Dashboard from '../pages/Dashboard';
+import OwnerDashboard from '../pages/OwnerDashboard';
 import MyBookings from '../pages/MyBookings';
 import MyPayments from '../pages/MyPayments';
 import PaymentSuccess from '../pages/PaymentSuccess';
@@ -100,6 +101,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={['owner', 'admin']}>
               <EditProperty />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="owner/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['owner', 'admin']}>
+              <OwnerDashboard />
             </ProtectedRoute>
           }
         />

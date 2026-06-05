@@ -98,7 +98,7 @@ const Navbar = () => {
           ))}
           {isAuthenticated && (
             <>
-              <NavLink to="/dashboard" className={linkClass}>
+              <NavLink to={['owner', 'admin'].includes(user?.role) ? '/owner/dashboard' : '/dashboard'} className={linkClass}>
                 Dashboard
               </NavLink>
               <NavLink to="/wishlist" className={linkClass}>
@@ -194,7 +194,7 @@ const Navbar = () => {
 
               {/* Avatar + name */}
               <Link
-                to="/dashboard"
+                to={['owner', 'admin'].includes(user?.role) ? '/owner/dashboard' : '/dashboard'}
                 className="flex items-center gap-2 rounded-full px-3 py-1.5 transition hover:bg-gray-50"
               >
                 {user?.avatar && !avatarErr ? (
@@ -271,7 +271,7 @@ const Navbar = () => {
             {isAuthenticated ? (
               <>
                 <NavLink
-                  to="/dashboard"
+                  to={['owner', 'admin'].includes(user?.role) ? '/owner/dashboard' : '/dashboard'}
                   className={linkClass}
                   onClick={() => setMenuOpen(false)}
                 >
