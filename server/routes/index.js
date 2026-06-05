@@ -5,6 +5,7 @@ import paymentRoutes from './paymentRoutes.js';
 import reviewRoutes from './reviewRoutes.js';
 import wishlistRoutes from './wishlistRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
+import dashboardRoutes from './dashboardRoutes.js';
 import testRoutes from './testRoutes.js';
 
 const registerRoutes = (app) => {
@@ -22,6 +23,7 @@ const registerRoutes = (app) => {
   app.use('/api/reviews', reviewRoutes);
   app.use('/api/wishlist', wishlistRoutes);
   app.use('/api/notifications', notificationRoutes);
+  app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/test', testRoutes);
 };
 
