@@ -1,0 +1,744 @@
+import { useState, useEffect, useCallback } from 'react';
+import {
+  FiUsers, FiHome, FiCalendar, FiDollarSign, FiStar,
+  FiBarChart2, FiSearch, FiTrash2, FiEdit, FiCheck,
+  FiX, FiChevronLeft, FiChevronRight, FiShield, FiActivity,
+} from 'react-icons/fi';
+import toast from 'react-hot-toast';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
+} from 'recharts';
+import {
+  fetchAdminDashboard,
+  fetchAdminUsers, updateAdminUser, deleteAdminUser,
+  fetchAdminProperties, updatePropertyStatus, deleteAdminProperty,
+  fetchAdminBookings,
+  fetchAdminPayments,
+  fetchAdminReviews, deleteAdminReview,
+} from '../services/adminService';
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtTrend = (arr, valueKey = 'count') =>
+  arr.map((d) => ({ name: `${MONTHS[(d._id?.month || 1) - 1]} ${d._id?.year}`, value: d[valueKey] ?? d.count ?? 0 }));
+const fmtCurrency = (n) => `₹${(n || 0).toLocaleString('en-IN')}`;
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+const COLORS = ['#ff385c','#00b894','#6c5ce7','#fdcb6e','#0984e3','#e17055'];
+
+const TAB_ITEMS = [
+  { key: 'overview', label: 'Overview', icon: FiBarChart2 },
+  { key: 'users', label: 'Users', icon: FiUsers },
+  { key: 'properties', label: 'Properties', icon: FiHome },
+  { key: 'bookings', label: 'Bookings', icon: FiCalendar },
+  { key: 'payments', label: 'Payments', icon: FiDollarSign },
+  { key: 'reviews', label: 'Reviews', icon: FiStar },
+];
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+const StatCard = ({ icon: Icon, label, value, color = '#ff385c', sub }) => (
+  <div className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-10" style={{ background: color }} />
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wider text-muted">{label}</p>
+        <p className="mt-1 text-2xl font-bold text-secondary">{value}</p>
+        {sub && <p className="mt-0.5 text-xs text-muted">{sub}</p>}
+      </div>
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${color}15` }}>
+        <Icon className="h-5 w-5" style={{ color }} />
+      </span>
+    </div>
+  </div>
+);
+
+// ─── Pagination ──────────────────────────────────────────────────────────────
+const Pagination = ({ page, pages, onPageChange }) => {
+  if (pages <= 1) return null;
+  return (
+    <div className="mt-4 flex items-center justify-center gap-2">
+      <button
+        onClick={() => onPageChange(page - 1)}
+        disabled={page <= 1}
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-muted transition hover:bg-gray-50 disabled:opacity-40"
+      >
+        <FiChevronLeft className="h-4 w-4" />
+      </button>
+      <span className="text-sm text-muted">Page {page} of {pages}</span>
+      <button
+        onClick={() => onPageChange(page + 1)}
+        disabled={page >= pages}
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-muted transition hover:bg-gray-50 disabled:opacity-40"
+      >
+        <FiChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+};
+
+// ─── CHART CARD ──────────────────────────────────────────────────────────────
+const ChartCard = ({ title, children }) => (
+  <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+    <h3 className="mb-4 text-sm font-semibold text-secondary">{title}</h3>
+    {children}
+  </div>
+);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═════════════════════════════════════════════════════════════════════════════
+const AdminDashboard = () => {
+  const [tab, setTab] = useState('overview');
+  const [dashboard, setDashboard] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Section states
+  const [users, setUsers] = useState({ users: [], total: 0, page: 1, pages: 1 });
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('');
+
+  const [properties, setProperties] = useState({ properties: [], total: 0, page: 1, pages: 1 });
+  const [propSearch, setPropSearch] = useState('');
+
+  const [bookings, setBookings] = useState({ bookings: [], total: 0, page: 1, pages: 1 });
+  const [bookingStatus, setBookingStatus] = useState('');
+
+  const [payments, setPayments] = useState({ payments: [], total: 0, page: 1, pages: 1, summary: {} });
+  const [paymentStatus, setPaymentStatus] = useState('');
+
+  const [reviews, setReviews] = useState({ reviews: [], total: 0, page: 1, pages: 1 });
+
+  // ── Load dashboard ────────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await fetchAdminDashboard();
+        setDashboard(data);
+      } catch (err) {
+        toast.error(err.message || 'Failed to load admin dashboard');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  // ── Section data loaders ──────────────────────────────────────────────────
+  const loadUsers = useCallback(async (page = 1) => {
+    try {
+      const data = await fetchAdminUsers({ page, search: userSearch, role: userRoleFilter });
+      setUsers(data);
+    } catch (err) { toast.error(err.message); }
+  }, [userSearch, userRoleFilter]);
+
+  const loadProperties = useCallback(async (page = 1) => {
+    try {
+      const data = await fetchAdminProperties({ page, search: propSearch });
+      setProperties(data);
+    } catch (err) { toast.error(err.message); }
+  }, [propSearch]);
+
+  const loadBookings = useCallback(async (page = 1) => {
+    try {
+      const data = await fetchAdminBookings({ page, status: bookingStatus });
+      setBookings(data);
+    } catch (err) { toast.error(err.message); }
+  }, [bookingStatus]);
+
+  const loadPayments = useCallback(async (page = 1) => {
+    try {
+      const data = await fetchAdminPayments({ page, status: paymentStatus });
+      setPayments(data);
+    } catch (err) { toast.error(err.message); }
+  }, [paymentStatus]);
+
+  const loadReviews = useCallback(async (page = 1) => {
+    try {
+      const data = await fetchAdminReviews({ page });
+      setReviews(data);
+    } catch (err) { toast.error(err.message); }
+  }, []);
+
+  // ── Load on tab switch ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (tab === 'users') loadUsers();
+    else if (tab === 'properties') loadProperties();
+    else if (tab === 'bookings') loadBookings();
+    else if (tab === 'payments') loadPayments();
+    else if (tab === 'reviews') loadReviews();
+  }, [tab, loadUsers, loadProperties, loadBookings, loadPayments, loadReviews]);
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+  const handleRoleChange = async (id, role) => {
+    try {
+      await updateAdminUser(id, { role });
+      toast.success('Role updated');
+      loadUsers(users.page);
+    } catch (err) { toast.error(err.message); }
+  };
+
+  const handleDeleteUser = async (id) => {
+    if (!confirm('Delete this user? This cannot be undone.')) return;
+    try {
+      await deleteAdminUser(id);
+      toast.success('User deleted');
+      loadUsers(users.page);
+    } catch (err) { toast.error(err.message); }
+  };
+
+  const handlePropertyAction = async (id, status) => {
+    try {
+      await updatePropertyStatus(id, status);
+      toast.success(`Property ${status}`);
+      loadProperties(properties.page);
+    } catch (err) { toast.error(err.message); }
+  };
+
+  const handleDeleteProperty = async (id) => {
+    if (!confirm('Delete this property?')) return;
+    try {
+      await deleteAdminProperty(id);
+      toast.success('Property deleted');
+      loadProperties(properties.page);
+    } catch (err) { toast.error(err.message); }
+  };
+
+  const handleDeleteReview = async (id) => {
+    if (!confirm('Delete this review?')) return;
+    try {
+      await deleteAdminReview(id);
+      toast.success('Review deleted');
+      loadReviews(reviews.page);
+    } catch (err) { toast.error(err.message); }
+  };
+
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  const s = dashboard?.stats || {};
+  const analytics = dashboard?.analytics || {};
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+              <FiShield className="h-5 w-5 text-primary" />
+            </span>
+            <h1 className="text-2xl font-bold text-secondary">Admin Dashboard</h1>
+          </div>
+          <p className="mt-1 text-sm text-muted">Manage your platform from one place</p>
+        </div>
+        <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-600">
+          <FiActivity className="h-3 w-3" />
+          Platform Active
+        </span>
+      </div>
+
+      {/* Sidebar Tabs (horizontal on mobile, sidebar-ish on desktop) */}
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <nav className="flex flex-row gap-1 overflow-x-auto rounded-2xl border border-gray-100 bg-gray-50/60 p-1.5 lg:w-52 lg:flex-col lg:self-start" id="admin-sidebar">
+          {TAB_ITEMS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              id={`admin-tab-${key}`}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                tab === key
+                  ? 'bg-white text-primary shadow-sm'
+                  : 'text-muted hover:bg-white/60 hover:text-secondary'
+              }`}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Content area */}
+        <div className="min-w-0 flex-1">
+          {/* ═══════ OVERVIEW ═══════ */}
+          {tab === 'overview' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                <StatCard icon={FiUsers} label="Total Users" value={s.totalUsers} color="#6c5ce7" sub={`${s.totalOwners} owners · ${s.totalTenants} tenants`} />
+                <StatCard icon={FiHome} label="Properties" value={s.totalProperties} color="#00b894" sub={`${s.activeProperties} active`} />
+                <StatCard icon={FiCalendar} label="Bookings" value={s.totalBookings} color="#0984e3" sub={`${s.activeBookings} active`} />
+                <StatCard icon={FiDollarSign} label="Revenue" value={fmtCurrency(s.totalRevenue)} color="#ff385c" sub={`${s.successPayments} payments`} />
+              </div>
+
+              {/* Charts */}
+              <div className="grid gap-6 md:grid-cols-2">
+                <ChartCard title="User Growth (6 months)">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={fmtTrend(analytics.userGrowth || [])}>
+                      <defs>
+                        <linearGradient id="ugFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6c5ce7" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#6c5ce7" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip />
+                      <Area type="monotone" dataKey="value" stroke="#6c5ce7" fill="url(#ugFill)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+                <ChartCard title="Revenue Trend (6 months)">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={fmtTrend(analytics.revenueTrend || [], 'revenue')}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip formatter={(v) => fmtCurrency(v)} />
+                      <Bar dataKey="value" fill="#ff385c" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+                <ChartCard title="Booking Trends (6 months)">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={fmtTrend(analytics.bookingTrend || [])}>
+                      <defs>
+                        <linearGradient id="btFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0984e3" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#0984e3" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip />
+                      <Area type="monotone" dataKey="value" stroke="#0984e3" fill="url(#btFill)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+                <ChartCard title="Property Growth (6 months)">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={fmtTrend(analytics.propertyGrowth || [])}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#00b894" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              </div>
+
+              {/* Recent Activity */}
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                  <h3 className="mb-3 text-sm font-semibold text-secondary">Recent Users</h3>
+                  <div className="space-y-3">
+                    {(dashboard?.recentUsers || []).map((u) => (
+                      <div key={u._id} className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                          {u.name?.[0]?.toUpperCase() || '?'}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-secondary">{u.name}</p>
+                          <p className="text-xs text-muted">{u.email}</p>
+                        </div>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                          u.role === 'admin' ? 'bg-purple-100 text-purple-600'
+                            : u.role === 'owner' ? 'bg-emerald-100 text-emerald-600'
+                            : 'bg-blue-100 text-blue-600'
+                        }`}>{u.role}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                  <h3 className="mb-3 text-sm font-semibold text-secondary">Recent Bookings</h3>
+                  <div className="space-y-3">
+                    {(dashboard?.recentBookings || []).map((b) => (
+                      <div key={b._id} className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
+                          <FiCalendar className="h-3.5 w-3.5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-secondary">
+                            {b.property?.title || 'Property'}
+                          </p>
+                          <p className="text-xs text-muted">{b.user?.name} · {fmtCurrency(b.totalAmount)}</p>
+                        </div>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                          b.bookingStatus === 'confirmed' ? 'bg-emerald-100 text-emerald-600'
+                            : b.bookingStatus === 'pending' ? 'bg-amber-100 text-amber-600'
+                            : b.bookingStatus === 'cancelled' ? 'bg-red-100 text-red-600'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>{b.bookingStatus}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══════ USERS ═══════ */}
+          {tab === 'users' && (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="relative flex-1">
+                  <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                  <input
+                    type="text"
+                    placeholder="Search users…"
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && loadUsers()}
+                    className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-secondary outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    id="admin-user-search"
+                  />
+                </div>
+                <select
+                  value={userRoleFilter}
+                  onChange={(e) => { setUserRoleFilter(e.target.value); }}
+                  className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-secondary outline-none transition focus:border-primary"
+                  id="admin-user-role-filter"
+                >
+                  <option value="">All Roles</option>
+                  <option value="tenant">Tenant</option>
+                  <option value="owner">Owner</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <button onClick={() => loadUsers()} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-dark">Search</button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <th className="px-4 py-3 font-semibold text-muted">Name</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Email</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Role</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Joined</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.users.map((u) => (
+                      <tr key={u._id} className="border-b border-gray-50 transition hover:bg-gray-50/50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                              {u.name?.[0]?.toUpperCase() || '?'}
+                            </span>
+                            <span className="font-medium text-secondary">{u.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-muted">{u.email}</td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleRoleChange(u._id, e.target.value)}
+                            className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium outline-none transition focus:border-primary"
+                          >
+                            <option value="tenant">Tenant</option>
+                            <option value="owner">Owner</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 text-muted">{fmtDate(u.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleDeleteUser(u._id)}
+                            className="rounded-lg p-1.5 text-red-400 transition hover:bg-red-50 hover:text-red-600"
+                            title="Delete user"
+                          >
+                            <FiTrash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {users.users.length === 0 && (
+                      <tr><td colSpan={5} className="px-4 py-10 text-center text-muted">No users found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination page={users.page} pages={users.pages} onPageChange={(p) => loadUsers(p)} />
+            </div>
+          )}
+
+          {/* ═══════ PROPERTIES ═══════ */}
+          {tab === 'properties' && (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="relative flex-1">
+                  <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                  <input
+                    type="text"
+                    placeholder="Search properties…"
+                    value={propSearch}
+                    onChange={(e) => setPropSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && loadProperties()}
+                    className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-secondary outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    id="admin-prop-search"
+                  />
+                </div>
+                <button onClick={() => loadProperties()} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-dark">Search</button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <th className="px-4 py-3 font-semibold text-muted">Property</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Owner</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Price</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Status</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {properties.properties.map((p) => (
+                      <tr key={p._id} className="border-b border-gray-50 transition hover:bg-gray-50/50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {p.images?.[0] ? (
+                              <img src={p.images[0]} alt="" className="h-8 w-8 rounded-lg object-cover" />
+                            ) : (
+                              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100"><FiHome className="h-4 w-4 text-muted" /></span>
+                            )}
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-secondary">{p.title}</p>
+                              <p className="text-xs text-muted">{p.city || p.address?.city}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-muted">{p.owner?.name || '—'}</td>
+                        <td className="px-4 py-3 font-medium">{fmtCurrency(p.price)}/mo</td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                            p.availability ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
+                          }`}>{p.availability ? 'Active' : 'Inactive'}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => handlePropertyAction(p._id, 'approved')} title="Approve" className="rounded-lg p-1.5 text-emerald-400 transition hover:bg-emerald-50 hover:text-emerald-600">
+                              <FiCheck className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => handlePropertyAction(p._id, 'rejected')} title="Reject" className="rounded-lg p-1.5 text-amber-400 transition hover:bg-amber-50 hover:text-amber-600">
+                              <FiX className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => handleDeleteProperty(p._id)} title="Delete" className="rounded-lg p-1.5 text-red-400 transition hover:bg-red-50 hover:text-red-600">
+                              <FiTrash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {properties.properties.length === 0 && (
+                      <tr><td colSpan={5} className="px-4 py-10 text-center text-muted">No properties found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination page={properties.page} pages={properties.pages} onPageChange={(p) => loadProperties(p)} />
+            </div>
+          )}
+
+          {/* ═══════ BOOKINGS ═══════ */}
+          {tab === 'bookings' && (
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <select
+                  value={bookingStatus}
+                  onChange={(e) => setBookingStatus(e.target.value)}
+                  className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-secondary outline-none transition focus:border-primary"
+                  id="admin-booking-status"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="completed">Completed</option>
+                </select>
+                <button onClick={() => loadBookings()} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-dark">Filter</button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <th className="px-4 py-3 font-semibold text-muted">Property</th>
+                      <th className="px-4 py-3 font-semibold text-muted">User</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Check-in</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Check-out</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Amount</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bookings.bookings.map((b) => (
+                      <tr key={b._id} className="border-b border-gray-50 transition hover:bg-gray-50/50">
+                        <td className="px-4 py-3 font-medium text-secondary">{b.property?.title || '—'}</td>
+                        <td className="px-4 py-3 text-muted">{b.user?.name || '—'}</td>
+                        <td className="px-4 py-3 text-muted">{fmtDate(b.checkInDate)}</td>
+                        <td className="px-4 py-3 text-muted">{fmtDate(b.checkOutDate)}</td>
+                        <td className="px-4 py-3 font-medium">{fmtCurrency(b.totalAmount)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                            b.bookingStatus === 'confirmed' ? 'bg-emerald-100 text-emerald-600'
+                              : b.bookingStatus === 'pending' ? 'bg-amber-100 text-amber-600'
+                              : b.bookingStatus === 'cancelled' ? 'bg-red-100 text-red-600'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>{b.bookingStatus}</span>
+                        </td>
+                      </tr>
+                    ))}
+                    {bookings.bookings.length === 0 && (
+                      <tr><td colSpan={6} className="px-4 py-10 text-center text-muted">No bookings found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination page={bookings.page} pages={bookings.pages} onPageChange={(p) => loadBookings(p)} />
+            </div>
+          )}
+
+          {/* ═══════ PAYMENTS ═══════ */}
+          {tab === 'payments' && (
+            <div className="space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <StatCard icon={FiDollarSign} label="Total Revenue" value={fmtCurrency(payments.summary?.totalRevenue)} color="#ff385c" />
+                <StatCard icon={FiCheck} label="Successful" value={payments.summary?.successCount || 0} color="#00b894" />
+                <StatCard icon={FiX} label="Failed" value={payments.summary?.failedCount || 0} color="#e17055" />
+                <StatCard icon={FiActivity} label="Pending" value={payments.summary?.pendingCount || 0} color="#fdcb6e" />
+              </div>
+
+              <div className="flex gap-3">
+                <select
+                  value={paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value)}
+                  className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-secondary outline-none transition focus:border-primary"
+                  id="admin-payment-status"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="success">Success</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
+                </select>
+                <button onClick={() => loadPayments()} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-dark">Filter</button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <th className="px-4 py-3 font-semibold text-muted">User</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Property</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Amount</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Status</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.payments.map((p) => (
+                      <tr key={p._id} className="border-b border-gray-50 transition hover:bg-gray-50/50">
+                        <td className="px-4 py-3 text-secondary">{p.user?.name || '—'}</td>
+                        <td className="px-4 py-3 text-muted">{p.property?.title || '—'}</td>
+                        <td className="px-4 py-3 font-medium">{fmtCurrency(p.amount)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                            p.paymentStatus === 'success' ? 'bg-emerald-100 text-emerald-600'
+                              : p.paymentStatus === 'pending' ? 'bg-amber-100 text-amber-600'
+                              : 'bg-red-100 text-red-600'
+                          }`}>{p.paymentStatus}</span>
+                        </td>
+                        <td className="px-4 py-3 text-muted">{fmtDate(p.transactionDate || p.createdAt)}</td>
+                      </tr>
+                    ))}
+                    {payments.payments.length === 0 && (
+                      <tr><td colSpan={5} className="px-4 py-10 text-center text-muted">No payments found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination page={payments.page} pages={payments.pages} onPageChange={(p) => loadPayments(p)} />
+            </div>
+          )}
+
+          {/* ═══════ REVIEWS ═══════ */}
+          {tab === 'reviews' && (
+            <div className="space-y-4">
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <th className="px-4 py-3 font-semibold text-muted">User</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Property</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Rating</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Comment</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Date</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reviews.reviews.map((r) => (
+                      <tr key={r._id} className="border-b border-gray-50 transition hover:bg-gray-50/50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                              {r.user?.name?.[0]?.toUpperCase() || '?'}
+                            </span>
+                            <span className="text-secondary">{r.user?.name || '—'}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-muted">{r.property?.title || '—'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-0.5">
+                            {[...Array(5)].map((_, i) => (
+                              <FiStar key={i} className={`h-3.5 w-3.5 ${i < r.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
+                            ))}
+                          </div>
+                        </td>
+                        <td className="max-w-xs px-4 py-3 text-muted">
+                          <p className="line-clamp-2">{r.comment}</p>
+                        </td>
+                        <td className="px-4 py-3 text-muted">{fmtDate(r.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleDeleteReview(r._id)}
+                            className="rounded-lg p-1.5 text-red-400 transition hover:bg-red-50 hover:text-red-600"
+                            title="Delete review"
+                          >
+                            <FiTrash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {reviews.reviews.length === 0 && (
+                      <tr><td colSpan={6} className="px-4 py-10 text-center text-muted">No reviews found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination page={reviews.page} pages={reviews.pages} onPageChange={(p) => loadReviews(p)} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDashboard;

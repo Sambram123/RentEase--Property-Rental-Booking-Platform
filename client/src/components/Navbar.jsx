@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { HiMenu, HiX } from 'react-icons/hi';
-import { FiHome, FiLogOut, FiUser, FiHeart, FiBell } from 'react-icons/fi';
+import { FiHome, FiLogOut, FiUser, FiHeart, FiBell, FiShield } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications, getNotifConfig } from '../context/NotificationContext';
@@ -107,6 +107,11 @@ const Navbar = () => {
               <NavLink to="/my-payments" className={linkClass}>
                 Payments
               </NavLink>
+              {user?.role === 'admin' && (
+                <NavLink to="/admin" className={linkClass}>
+                  <span className="flex items-center gap-1"><FiShield className="h-3.5 w-3.5" /> Admin</span>
+                </NavLink>
+              )}
             </>
           )}
         </div>
@@ -306,6 +311,15 @@ const Navbar = () => {
                 >
                   Payments
                 </NavLink>
+                {user?.role === 'admin' && (
+                  <NavLink
+                    to="/admin"
+                    className={linkClass}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <span className="flex items-center gap-1"><FiShield className="h-3.5 w-3.5" /> Admin</span>
+                  </NavLink>
+                )}
 
                 {/* User info */}
                 <div className="flex items-center gap-2 py-1">

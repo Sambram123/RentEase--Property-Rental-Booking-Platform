@@ -8,6 +8,7 @@ import PropertyDetails from '../pages/PropertyDetails';
 import AddProperty from '../pages/AddProperty';
 import Dashboard from '../pages/Dashboard';
 import OwnerDashboard from '../pages/OwnerDashboard';
+import AdminDashboard from '../pages/AdminDashboard';
 import MyBookings from '../pages/MyBookings';
 import MyPayments from '../pages/MyPayments';
 import PaymentSuccess from '../pages/PaymentSuccess';
@@ -17,6 +18,7 @@ import Wishlist from '../pages/Wishlist';
 import Notifications from '../pages/Notifications';
 import NotFound from '../pages/NotFound';
 import ProtectedRoute from '../components/ProtectedRoute';
+import AdminRoute from '../components/AdminRoute';
 
 const AppRoutes = () => {
   return (
@@ -112,6 +114,16 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* ── Protected: admin only ── */}
+        <Route
+          path="admin/*"
+          element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
+          }
+        />
       </Route>
 
       {/* 404 */}
@@ -121,3 +133,4 @@ const AppRoutes = () => {
 };
 
 export default AppRoutes;
+
