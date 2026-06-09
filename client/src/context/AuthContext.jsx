@@ -137,6 +137,17 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
   }, []);
 
+  /**
+   * Update stored user (e.g. after profile edit)
+   */
+  const updateUser = useCallback((updatedUser) => {
+    const storedToken = getStoredToken();
+    if (storedToken) {
+      saveSession(storedToken, updatedUser);
+    }
+    setUser(updatedUser);
+  }, []);
+
   // ─── Context value ─────────────────────────────────────────────────────────
   const value = {
     user,
@@ -148,6 +159,7 @@ export const AuthProvider = ({ children }) => {
     loginWithGoogle,
     logout,
     setUser,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
