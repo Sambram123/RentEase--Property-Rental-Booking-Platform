@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  FiCalendar, FiHome, FiHeart, FiCreditCard, FiDollarSign,
+  FiCalendar, FiHome, FiHeart, FiCreditCard,
   FiBell, FiCheckCircle, FiXCircle, FiClock, FiSearch,
-  FiArrowRight, FiTrendingUp,
+  FiArrowRight, FiTrendingUp, FiUser, FiSettings,
 } from 'react-icons/fi';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -11,6 +11,8 @@ import {
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import { fetchTenantDashboard } from '../services/dashboardService';
+import { getProfile } from '../services/userService';
+import ProfileCard from '../components/ProfileCard';
 import { formatPrice } from '../utils/constants';
 import ActivityFeed from '../components/ActivityFeed';
 
@@ -82,6 +84,7 @@ const Dashboard = () => {
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profileData, setProfileData] = useState(null);
 
   // Redirect owner/admin to /owner/dashboard
   useEffect(() => {
@@ -94,8 +97,12 @@ const Dashboard = () => {
     if (isOwnerOrAdmin) return;
     const load = async () => {
       try {
-        const result = await fetchTenantDashboard();
+        const [result, profile] = await Promise.all([
+          fetchTenantDashboard(),
+          getProfile().catch(() => null),
+        ]);
         setData(result);
+        if (profile) setProfileData(profile);
       } catch {
         // silently skip
       } finally {
@@ -145,6 +152,27 @@ const Dashboard = () => {
           </Link>
         </div>
       </div>
+
+      {/* ── Profile summary ──────────────────────────────────────────── */}
+      {profileData && (
+        <section className="mb-10">
+          <ProfileCard profile={profileData.user} completion={profileData.profileCompletion} />
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              to="/profile"
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-secondary transition hover:bg-gray-50"
+            >
+              <FiUser className="h-4 w-4" /> Edit profile
+            </Link>
+            <Link
+              to="/settings"
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-secondary transition hover:bg-gray-50"
+            >
+              <FiSettings className="h-4 w-4" /> Account settings
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* ── Stats row ──────────────────────────────────────────────── */}
       {loading ? (

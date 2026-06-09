@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { HiMenu, HiX } from 'react-icons/hi';
-import { FiHome, FiLogOut, FiUser, FiHeart, FiBell, FiShield } from 'react-icons/fi';
+import { FiHome, FiLogOut, FiUser, FiHeart, FiBell, FiShield, FiSettings, FiChevronDown } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications, getNotifConfig } from '../context/NotificationContext';
@@ -31,13 +31,18 @@ const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [avatarErr, setAvatarErr] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const bellRef = useRef(null);
+  const profileRef = useRef(null);
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClick = (e) => {
       if (bellRef.current && !bellRef.current.contains(e.target)) {
         setBellOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setProfileOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -197,27 +202,61 @@ const Navbar = () => {
                 )}
               </div>
 
-              {/* Avatar + name */}
-              <Link
-                to={['owner', 'admin'].includes(user?.role) ? '/owner/dashboard' : '/dashboard'}
-                className="flex items-center gap-2 rounded-full px-3 py-1.5 transition hover:bg-gray-50"
-              >
-                {user?.avatar && !avatarErr ? (
-                  <img
-                    src={user.avatar}
-                    alt={user.name}
-                    onError={() => setAvatarErr(true)}
-                    className="h-8 w-8 rounded-full object-cover ring-2 ring-primary/20"
-                  />
-                ) : (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                    {initials}
+              {/* Profile menu */}
+              <div className="relative" ref={profileRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen(!profileOpen)}
+                  className="flex items-center gap-2 rounded-full px-3 py-1.5 transition hover:bg-gray-50"
+                >
+                  {user?.avatar && !avatarErr ? (
+                    <img
+                      src={user.avatar}
+                      alt={user.name}
+                      onError={() => setAvatarErr(true)}
+                      className="h-8 w-8 rounded-full object-cover ring-2 ring-primary/20"
+                    />
+                  ) : (
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                      {initials}
+                    </span>
+                  )}
+                  <span className="max-w-[100px] truncate text-sm font-medium text-secondary">
+                    {user?.name?.split(' ')[0]}
                   </span>
+                  <FiChevronDown className={`h-3.5 w-3.5 text-muted transition ${profileOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {profileOpen && (
+                  <div className="absolute right-0 top-12 z-50 w-52 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl">
+                    <div className="border-b border-gray-100 px-4 py-3">
+                      <p className="truncate text-sm font-semibold text-secondary">{user?.name}</p>
+                      <p className="truncate text-xs text-muted">{user?.email}</p>
+                    </div>
+                    <Link
+                      to="/profile"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-secondary transition hover:bg-gray-50"
+                    >
+                      <FiUser className="h-4 w-4" /> My Profile
+                    </Link>
+                    <Link
+                      to="/settings"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-secondary transition hover:bg-gray-50"
+                    >
+                      <FiSettings className="h-4 w-4" /> Settings
+                    </Link>
+                    <Link
+                      to={['owner', 'admin'].includes(user?.role) ? '/owner/dashboard' : '/dashboard'}
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-secondary transition hover:bg-gray-50"
+                    >
+                      <FiHome className="h-4 w-4" /> Dashboard
+                    </Link>
+                  </div>
                 )}
-                <span className="max-w-[100px] truncate text-sm font-medium text-secondary">
-                  {user?.name?.split(' ')[0]}
-                </span>
-              </Link>
+              </div>
 
               {/* Logout */}
               <button
@@ -320,6 +359,13 @@ const Navbar = () => {
                     <span className="flex items-center gap-1"><FiShield className="h-3.5 w-3.5" /> Admin</span>
                   </NavLink>
                 )}
+
+                <NavLink to="/profile" className={linkClass} onClick={() => setMenuOpen(false)}>
+                  <span className="flex items-center gap-1"><FiUser className="h-3.5 w-3.5" /> Profile</span>
+                </NavLink>
+                <NavLink to="/settings" className={linkClass} onClick={() => setMenuOpen(false)}>
+                  <span className="flex items-center gap-1"><FiSettings className="h-3.5 w-3.5" /> Settings</span>
+                </NavLink>
 
                 {/* User info */}
                 <div className="flex items-center gap-2 py-1">

@@ -4,7 +4,7 @@ import {
   FiCalendar, FiHome, FiPlus, FiEdit2, FiTrash2,
   FiEye, FiToggleLeft, FiToggleRight, FiCheckCircle,
   FiXCircle, FiClock, FiUser, FiCreditCard, FiDollarSign,
-  FiBell, FiStar, FiTrendingUp, FiArrowRight, FiBarChart2,
+  FiBell, FiStar, FiTrendingUp, FiArrowRight, FiBarChart2, FiSettings,
 } from 'react-icons/fi';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -13,6 +13,8 @@ import {
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { fetchOwnerDashboard } from '../services/dashboardService';
+import { getProfile } from '../services/userService';
+import ProfileCard from '../components/ProfileCard';
 import { deleteProperty } from '../services/propertyService';
 import { updateBookingStatus } from '../services/bookingService';
 import { formatPrice } from '../utils/constants';
@@ -84,6 +86,7 @@ const OwnerDashboard = () => {
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profileData, setProfileData] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [updatingBk, setUpdatingBk] = useState(null);
 
@@ -98,8 +101,12 @@ const OwnerDashboard = () => {
     if (!isOwnerOrAdmin) return;
     const load = async () => {
       try {
-        const result = await fetchOwnerDashboard();
+        const [result, profile] = await Promise.all([
+          fetchOwnerDashboard(),
+          getProfile().catch(() => null),
+        ]);
         setData(result);
+        if (profile) setProfileData(profile);
       } catch {
         // silently skip
       } finally {
@@ -194,6 +201,27 @@ const OwnerDashboard = () => {
           </Link>
         </div>
       </div>
+
+      {/* ── Profile summary ──────────────────────────────────────────── */}
+      {profileData && (
+        <section className="mb-10">
+          <ProfileCard profile={profileData.user} completion={profileData.profileCompletion} />
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              to="/profile"
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-secondary transition hover:bg-gray-50"
+            >
+              <FiUser className="h-4 w-4" /> Edit profile
+            </Link>
+            <Link
+              to="/settings"
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-secondary transition hover:bg-gray-50"
+            >
+              <FiSettings className="h-4 w-4" /> Account settings
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* ── Stats row ──────────────────────────────────────────────── */}
       {loading ? (
