@@ -37,6 +37,39 @@ const userSchema = new mongoose.Schema(
       default: '',
     },
 
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Bio cannot exceed 500 characters'],
+      default: '',
+    },
+
+    city: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'City cannot exceed 100 characters'],
+      default: '',
+    },
+
+    state: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'State cannot exceed 100 characters'],
+      default: '',
+    },
+
+    avatarPublicId: {
+      type: String,
+      default: '',
+    },
+
+    preferences: {
+      bookingNotifications: { type: Boolean, default: true },
+      paymentNotifications: { type: Boolean, default: true },
+      reviewNotifications: { type: Boolean, default: true },
+      marketingNotifications: { type: Boolean, default: false },
+    },
+
     role: {
       type: String,
       enum: {

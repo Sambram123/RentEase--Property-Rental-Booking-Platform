@@ -1,4 +1,5 @@
 import authRoutes from './authRoutes.js';
+import userRoutes from './userRoutes.js';
 import propertyRoutes from './propertyRoutes.js';
 import bookingRoutes from './bookingRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
@@ -18,6 +19,7 @@ const registerRoutes = (app) => {
   });
 
   app.use('/api/auth', authRoutes);
+  app.use('/api/users', userRoutes);
   app.use('/api/properties', propertyRoutes);
   app.use('/api/bookings', bookingRoutes);
   app.use('/api/payments', paymentRoutes);
