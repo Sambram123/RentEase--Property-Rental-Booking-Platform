@@ -8,6 +8,7 @@ import wishlistRoutes from './wishlistRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
 import dashboardRoutes from './dashboardRoutes.js';
 import adminRoutes from './adminRoutes.js';
+import messageRoutes from './messageRoutes.js';
 import testRoutes from './testRoutes.js';
 
 const registerRoutes = (app) => {
@@ -28,6 +29,7 @@ const registerRoutes = (app) => {
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/messages', messageRoutes);
   app.use('/api/test', testRoutes);
 };
 

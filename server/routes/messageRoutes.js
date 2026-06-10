@@ -1,0 +1,26 @@
+import { Router } from 'express';
+import { protect } from '../middleware/authMiddleware.js';
+import {
+  createConversation,
+  getConversations,
+  getConversationMessages,
+  sendMessage,
+  markMessagesRead,
+  deleteMessage,
+  getUnreadCount,
+} from '../controllers/messageController.js';
+
+const router = Router();
+
+// All routes require authentication
+router.use(protect);
+
+router.post('/conversation', createConversation);
+router.get('/conversations', getConversations);
+router.get('/conversation/:id', getConversationMessages);
+router.post('/send', sendMessage);
+router.put('/read/:conversationId', markMessagesRead);
+router.get('/unread-count', getUnreadCount);
+router.delete('/:messageId', deleteMessage);
+
+export default router;
