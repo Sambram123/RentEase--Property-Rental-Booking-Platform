@@ -1,6 +1,7 @@
 import asyncHandler from '../utils/asyncHandler.js';
 import User from '../models/User.js';
 import generateToken from '../utils/generateToken.js';
+import { applyDiceBearAvatar } from '../utils/dicebear.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // @desc    Register a new user
@@ -35,6 +36,8 @@ const registerUser = asyncHandler(async (req, res) => {
     password,
     role: role || 'tenant',
   });
+  applyDiceBearAvatar(user, { seed: user.email });
+  await user.save();
 
   // ── Generate JWT ──────────────────────────────────────────────────────────
   const token = generateToken({ id: user._id, role: user.role });
@@ -151,16 +154,14 @@ const firebaseAuth = asyncHandler(async (req, res) => {
       name: name || 'RentEase User',
       email: email.toLowerCase().trim(),
       password: firebaseUid + process.env.JWT_SECRET, // deterministic, never used for login
-      avatar: avatar || '',
       isVerified: true, // Firebase already verified
       role: 'tenant',
     });
-  } else {
-    // Optionally update avatar if it changed
-    if (avatar && !user.avatar) {
-      user.avatar = avatar;
-      await user.save();
-    }
+    applyDiceBearAvatar(user, { seed: user.email });
+    await user.save();
+  } else if (!user.avatar) {
+    applyDiceBearAvatar(user, { seed: user.email });
+    await user.save();
   }
 
   const token = generateToken({ id: user._id, role: user.role });

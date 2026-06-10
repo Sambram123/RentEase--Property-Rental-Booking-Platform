@@ -25,16 +25,12 @@ export const updatePreferences = async (payload) => {
   return data.data.preferences;
 };
 
-export const uploadAvatar = async (file) => {
-  const formData = new FormData();
-  formData.append('avatar', file);
-  const { data } = await api.post('/users/avatar', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+export const updateAvatar = async (payload) => {
+  const { data } = await api.put('/users/avatar', payload);
   return data.data;
 };
 
-export const removeAvatar = async () => {
+export const resetAvatar = async () => {
   const { data } = await api.delete('/users/avatar');
   return data.data;
 };

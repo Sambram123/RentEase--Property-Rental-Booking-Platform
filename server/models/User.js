@@ -58,9 +58,18 @@ const userSchema = new mongoose.Schema(
       default: '',
     },
 
-    avatarPublicId: {
+    avatarSeed: {
       type: String,
       default: '',
+    },
+
+    avatarStyle: {
+      type: String,
+      enum: {
+        values: ['avataaars', 'adventurer', 'bottts', 'fun-emoji', 'lorelei', 'micah', 'notionists', 'pixel-art'],
+        message: '{VALUE} is not a valid avatar style',
+      },
+      default: 'avataaars',
     },
 
     preferences: {

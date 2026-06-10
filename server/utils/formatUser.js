@@ -4,6 +4,8 @@ const formatUser = (user) => ({
   email: user.email,
   role: user.role,
   avatar: user.avatar,
+  avatarSeed: user.avatarSeed,
+  avatarStyle: user.avatarStyle,
   phone: user.phone,
   bio: user.bio,
   city: user.city,

@@ -89,7 +89,7 @@ const propertySchema = new mongoose.Schema(
     },
 
     images: {
-      type: [String], // array of URL strings (Cloudinary / S3 later)
+      type: [String], // array of image URL strings
       default: [],
     },
 

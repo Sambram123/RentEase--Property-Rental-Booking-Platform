@@ -6,28 +6,8 @@ import Review from '../models/Review.js';
 import Notification from '../models/Notification.js';
 import formatUser, { getProfileCompletion } from '../utils/formatUser.js';
 import { validatePasswordStrength } from '../utils/passwordValidator.js';
-import { cloudinary, isCloudinaryConfigured } from '../config/cloudinary.js';
-
-const deleteCloudinaryImage = async (publicId) => {
-  if (!publicId || !isCloudinaryConfigured()) return;
-  try {
-    await cloudinary.uploader.destroy(publicId);
-  } catch {
-    // non-fatal — image may already be removed
-  }
-};
-
-const uploadToCloudinary = (buffer) =>
-  new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder: 'rentease/avatars', transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }] },
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      }
-    );
-    stream.end(buffer);
-  });
+import { applyDiceBearAvatar, AVATAR_STYLES } from '../utils/dicebear.js';
+import crypto from 'crypto';
 
 // GET /api/users/profile
 const getProfile = asyncHandler(async (req, res) => {
@@ -43,13 +23,14 @@ const getProfile = asyncHandler(async (req, res) => {
     data: {
       user: formatUser(user),
       profileCompletion: getProfileCompletion(user),
+      avatarStyles: AVATAR_STYLES,
     },
   });
 });
 
 // PUT /api/users/profile
 const updateProfile = asyncHandler(async (req, res) => {
-  const { name, email, phone, bio, city, state, avatar } = req.body;
+  const { name, email, phone, bio, city, state } = req.body;
   const user = await User.findById(req.user.id);
 
   if (!user) {
@@ -85,11 +66,6 @@ const updateProfile = asyncHandler(async (req, res) => {
   if (bio !== undefined) user.bio = bio.trim();
   if (city !== undefined) user.city = city.trim();
   if (state !== undefined) user.state = state.trim();
-
-  // Allow URL-based avatar update (e.g. external link)
-  if (avatar !== undefined && typeof avatar === 'string') {
-    user.avatar = avatar.trim();
-  }
 
   await user.save();
 
@@ -196,17 +172,9 @@ const updatePreferences = asyncHandler(async (req, res) => {
   });
 });
 
-// POST /api/users/avatar
-const uploadAvatar = asyncHandler(async (req, res) => {
-  if (!req.file) {
-    res.status(400);
-    throw new Error('Please upload an image file');
-  }
-
-  if (!isCloudinaryConfigured()) {
-    res.status(503);
-    throw new Error('Image upload is not configured. Set Cloudinary environment variables.');
-  }
+// PUT /api/users/avatar — update DiceBear style or regenerate
+const updateAvatar = asyncHandler(async (req, res) => {
+  const { style, regenerate } = req.body;
 
   const user = await User.findById(req.user.id);
   if (!user) {
@@ -214,20 +182,18 @@ const uploadAvatar = asyncHandler(async (req, res) => {
     throw new Error('User not found');
   }
 
-  const result = await uploadToCloudinary(req.file.buffer);
-
-  // Remove old Cloudinary avatar if present
-  if (user.avatarPublicId) {
-    await deleteCloudinaryImage(user.avatarPublicId);
+  if (style && !AVATAR_STYLES.includes(style)) {
+    res.status(400);
+    throw new Error('Invalid avatar style');
   }
 
-  user.avatar = result.secure_url;
-  user.avatarPublicId = result.public_id;
+  const seed = regenerate ? crypto.randomUUID() : undefined;
+  applyDiceBearAvatar(user, { style, seed });
   await user.save();
 
   res.status(200).json({
     success: true,
-    message: 'Avatar uploaded successfully',
+    message: 'Avatar updated successfully',
     data: {
       user: formatUser(user),
       profileCompletion: getProfileCompletion(user),
@@ -235,25 +201,23 @@ const uploadAvatar = asyncHandler(async (req, res) => {
   });
 });
 
-// DELETE /api/users/avatar
-const removeAvatar = asyncHandler(async (req, res) => {
+// DELETE /api/users/avatar — reset to default DiceBear avatar
+const resetAvatar = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id);
   if (!user) {
     res.status(404);
     throw new Error('User not found');
   }
 
-  if (user.avatarPublicId) {
-    await deleteCloudinaryImage(user.avatarPublicId);
-  }
-
-  user.avatar = '';
-  user.avatarPublicId = '';
+  applyDiceBearAvatar(user, {
+    style: 'avataaars',
+    seed: user._id.toString(),
+  });
   await user.save();
 
   res.status(200).json({
     success: true,
-    message: 'Avatar removed successfully',
+    message: 'Avatar reset successfully',
     data: {
       user: formatUser(user),
       profileCompletion: getProfileCompletion(user),
@@ -284,13 +248,8 @@ const deleteAccount = asyncHandler(async (req, res) => {
     }
   }
 
-  if (user.avatarPublicId) {
-    await deleteCloudinaryImage(user.avatarPublicId);
-  }
-
   const userId = user._id;
 
-  // Clean up related data
   await Promise.all([
     Booking.deleteMany({ user: userId }),
     Payment.deleteMany({ user: userId }),
@@ -312,7 +271,7 @@ export {
   changePassword,
   getPreferences,
   updatePreferences,
-  uploadAvatar,
-  removeAvatar,
+  updateAvatar,
+  resetAvatar,
   deleteAccount,
 };

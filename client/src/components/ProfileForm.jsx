@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react';
-import { FiCamera, FiTrash2, FiLoader } from 'react-icons/fi';
+import { useState } from 'react';
+import { FiRefreshCw, FiRotateCcw, FiLoader } from 'react-icons/fi';
 import toast from 'react-hot-toast';
-import { uploadAvatar, removeAvatar } from '../services/userService';
+import { updateAvatar, resetAvatar } from '../services/userService';
+import { AVATAR_STYLES, getDiceBearUrl, getUserAvatar } from '../utils/avatar';
 
 const Field = ({ label, id, error, children }) => (
   <div>
@@ -17,7 +18,6 @@ const inputClass = (error) =>
   }`;
 
 const ProfileForm = ({ profile, onSave, saving = false }) => {
-  const fileRef = useRef(null);
   const [form, setForm] = useState({
     name: profile?.name || '',
     email: profile?.email || '',
@@ -27,8 +27,11 @@ const ProfileForm = ({ profile, onSave, saving = false }) => {
     state: profile?.state || '',
   });
   const [errors, setErrors] = useState({});
-  const [avatar, setAvatar] = useState(profile?.avatar || '');
+  const [avatar, setAvatar] = useState(getUserAvatar(profile));
+  const [selectedStyle, setSelectedStyle] = useState(profile?.avatarStyle || 'avataaars');
   const [avatarLoading, setAvatarLoading] = useState(false);
+
+  const previewSeed = profile?.avatarSeed || profile?.email || profile?._id || 'preview';
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -55,89 +58,108 @@ const ProfileForm = ({ profile, onSave, saving = false }) => {
     await onSave(form);
   };
 
-  const handleAvatarSelect = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
-      toast.error('Only JPEG, PNG, WebP, and GIF images are allowed');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be under 5 MB');
-      return;
-    }
-
+  const handleStyleSelect = async (style) => {
+    setSelectedStyle(style);
     setAvatarLoading(true);
     try {
-      const result = await uploadAvatar(file);
+      const result = await updateAvatar({ style });
       setAvatar(result.user.avatar);
-      toast.success('Avatar uploaded successfully');
+      toast.success('Avatar style updated');
       if (onSave) onSave(form, result.user, false);
     } catch (err) {
-      toast.error(err.message || 'Failed to upload avatar');
+      toast.error(err.message || 'Failed to update avatar');
     } finally {
       setAvatarLoading(false);
-      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
-  const handleRemoveAvatar = async () => {
+  const handleRegenerate = async () => {
     setAvatarLoading(true);
     try {
-      const result = await removeAvatar();
-      setAvatar('');
-      toast.success('Avatar removed');
+      const result = await updateAvatar({ style: selectedStyle, regenerate: true });
+      setAvatar(result.user.avatar);
+      toast.success('New avatar generated');
       if (onSave) onSave(form, result.user, false);
     } catch (err) {
-      toast.error(err.message || 'Failed to remove avatar');
+      toast.error(err.message || 'Failed to regenerate avatar');
     } finally {
       setAvatarLoading(false);
     }
   };
 
-  const initials = form.name
-    ? form.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
-    : '?';
+  const handleReset = async () => {
+    setAvatarLoading(true);
+    try {
+      const result = await resetAvatar();
+      setAvatar(result.user.avatar);
+      setSelectedStyle(result.user.avatarStyle || 'avataaars');
+      toast.success('Avatar reset to default');
+      if (onSave) onSave(form, result.user, false);
+    } catch (err) {
+      toast.error(err.message || 'Failed to reset avatar');
+    } finally {
+      setAvatarLoading(false);
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Avatar section */}
-      <div className="flex flex-col items-center gap-4 sm:flex-row">
-        <div className="relative">
-          {avatar ? (
-            <img src={avatar} alt="Avatar" className="h-24 w-24 rounded-full object-cover ring-4 ring-primary/10" />
-          ) : (
-            <span className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 text-2xl font-bold text-primary ring-4 ring-primary/10">
-              {initials}
-            </span>
-          )}
-          {avatarLoading && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
-              <FiLoader className="h-6 w-6 animate-spin text-white" />
-            </div>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            disabled={avatarLoading}
-            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-dark disabled:opacity-50"
-          >
-            <FiCamera className="h-4 w-4" /> Upload
-          </button>
-          {avatar && (
+      <div>
+        <p className="mb-3 text-sm font-medium text-secondary">Avatar</p>
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+          <div className="relative shrink-0">
+            <img
+              src={avatar}
+              alt="Avatar"
+              className="h-24 w-24 rounded-full object-cover ring-4 ring-primary/10"
+            />
+            {avatarLoading && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                <FiLoader className="h-6 w-6 animate-spin text-white" />
+              </div>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={handleRemoveAvatar}
+              onClick={handleRegenerate}
+              disabled={avatarLoading}
+              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-dark disabled:opacity-50"
+            >
+              <FiRefreshCw className="h-4 w-4" /> Regenerate
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
               disabled={avatarLoading}
               className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-secondary transition hover:bg-gray-50 disabled:opacity-50"
             >
-              <FiTrash2 className="h-4 w-4" /> Remove
+              <FiRotateCcw className="h-4 w-4" /> Reset
             </button>
-          )}
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
+          </div>
+        </div>
+
+        <p className="mt-4 mb-2 text-xs font-medium uppercase tracking-wide text-muted">Choose a style</p>
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+          {AVATAR_STYLES.map((style) => (
+            <button
+              key={style}
+              type="button"
+              onClick={() => handleStyleSelect(style)}
+              disabled={avatarLoading}
+              className={`overflow-hidden rounded-xl border-2 p-1 transition disabled:opacity-50 ${
+                selectedStyle === style ? 'border-primary ring-2 ring-primary/20' : 'border-gray-100 hover:border-gray-200'
+              }`}
+              title={style}
+            >
+              <img
+                src={getDiceBearUrl(previewSeed, style)}
+                alt={style}
+                className="h-10 w-10 rounded-lg object-cover"
+              />
+            </button>
+          ))}
         </div>
       </div>
 

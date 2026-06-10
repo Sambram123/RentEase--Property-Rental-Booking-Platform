@@ -441,7 +441,7 @@ const AddProperty = () => {
             />
           </Field>
           <p className="mt-2 text-xs text-muted">
-            📸 Direct Cloudinary upload coming in a future update.
+            📸 Direct image upload coming in a future update.
           </p>
         </section>
 

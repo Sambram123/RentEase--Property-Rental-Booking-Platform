@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom';
 import { FiMail, FiPhone, FiMapPin, FiCalendar, FiShield, FiEdit2 } from 'react-icons/fi';
+import { getUserAvatar } from '../utils/avatar';
 
 const ProfileCard = ({ profile, completion = 0 }) => {
-  const initials = profile?.name
-    ? profile.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
-    : '?';
+  const avatarUrl = getUserAvatar(profile);
 
   const fmtDate = (d) =>
     d ? new Date(d).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : '—';
@@ -12,17 +11,11 @@ const ProfileCard = ({ profile, completion = 0 }) => {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
       <div className="flex flex-col items-center text-center sm:flex-row sm:items-start sm:text-left">
-        {profile?.avatar ? (
-          <img
-            src={profile.avatar}
-            alt={profile.name}
-            className="h-24 w-24 rounded-full object-cover ring-4 ring-primary/10"
-          />
-        ) : (
-          <span className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 text-2xl font-bold text-primary ring-4 ring-primary/10">
-            {initials}
-          </span>
-        )}
+        <img
+          src={avatarUrl}
+          alt={profile?.name}
+          className="h-24 w-24 rounded-full object-cover ring-4 ring-primary/10"
+        />
 
         <div className="mt-4 sm:mt-0 sm:ml-6 sm:flex-1">
           <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-start sm:justify-between">
