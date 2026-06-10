@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { HiMenu, HiX } from 'react-icons/hi';
-import { FiHome, FiLogOut, FiUser, FiHeart, FiBell, FiShield, FiSettings, FiChevronDown } from 'react-icons/fi';
+import { FiHome, FiLogOut, FiUser, FiHeart, FiBell, FiShield, FiSettings, FiChevronDown, FiMessageSquare } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { getUserAvatar } from '../utils/avatar';
 import { useNotifications, getNotifConfig } from '../context/NotificationContext';
 import { markNotificationRead } from '../services/notificationService';
 
@@ -29,7 +30,6 @@ const Navbar = () => {
   const { unreadCount, recentNotifications, decrementUnread } = useNotifications();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [avatarErr, setAvatarErr] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const bellRef = useRef(null);
@@ -76,10 +76,7 @@ const Navbar = () => {
     navigate('/notifications');
   };
 
-  // ── Avatar: initials fallback ─────────────────────────────────────────────
-  const initials = user?.name
-    ? user.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
-    : '?';
+  const avatarUrl = user ? getUserAvatar(user) : '';
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/95 backdrop-blur-sm">
@@ -108,6 +105,9 @@ const Navbar = () => {
               </NavLink>
               <NavLink to="/wishlist" className={linkClass}>
                 <span className="flex items-center gap-1"><FiHeart className="h-3.5 w-3.5" /> Wishlist</span>
+              </NavLink>
+              <NavLink to="/messages" className={linkClass}>
+                <span className="flex items-center gap-1"><FiMessageSquare className="h-3.5 w-3.5" /> Messages</span>
               </NavLink>
               <NavLink to="/my-payments" className={linkClass}>
                 Payments
@@ -209,18 +209,11 @@ const Navbar = () => {
                   onClick={() => setProfileOpen(!profileOpen)}
                   className="flex items-center gap-2 rounded-full px-3 py-1.5 transition hover:bg-gray-50"
                 >
-                  {user?.avatar && !avatarErr ? (
-                    <img
-                      src={user.avatar}
-                      alt={user.name}
-                      onError={() => setAvatarErr(true)}
-                      className="h-8 w-8 rounded-full object-cover ring-2 ring-primary/20"
-                    />
-                  ) : (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                      {initials}
-                    </span>
-                  )}
+                  <img
+                    src={avatarUrl}
+                    alt={user.name}
+                    className="h-8 w-8 rounded-full object-cover ring-2 ring-primary/20"
+                  />
                   <span className="max-w-[100px] truncate text-sm font-medium text-secondary">
                     {user?.name?.split(' ')[0]}
                   </span>
@@ -344,6 +337,13 @@ const Navbar = () => {
                   <span className="flex items-center gap-1"><FiHeart className="h-3.5 w-3.5" /> Wishlist</span>
                 </NavLink>
                 <NavLink
+                  to="/messages"
+                  className={linkClass}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <span className="flex items-center gap-1"><FiMessageSquare className="h-3.5 w-3.5" /> Messages</span>
+                </NavLink>
+                <NavLink
                   to="/my-payments"
                   className={linkClass}
                   onClick={() => setMenuOpen(false)}
@@ -369,18 +369,11 @@ const Navbar = () => {
 
                 {/* User info */}
                 <div className="flex items-center gap-2 py-1">
-                  {user?.avatar && !avatarErr ? (
-                    <img
-                      src={user.avatar}
-                      alt={user.name}
-                      onError={() => setAvatarErr(true)}
-                      className="h-8 w-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                      {initials}
-                    </span>
-                  )}
+                  <img
+                    src={avatarUrl}
+                    alt={user.name}
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
                   <div>
                     <p className="text-sm font-medium text-secondary">{user?.name}</p>
                     <p className="text-xs text-muted capitalize">{user?.role}</p>

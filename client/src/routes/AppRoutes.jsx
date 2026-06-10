@@ -16,6 +16,7 @@ import PaymentFailed from '../pages/PaymentFailed';
 import EditProperty from '../pages/EditProperty';
 import Wishlist from '../pages/Wishlist';
 import Notifications from '../pages/Notifications';
+import Messages from '../pages/Messages';
 import Profile from '../pages/Profile';
 import Settings from '../pages/Settings';
 import NotFound from '../pages/NotFound';
@@ -91,7 +92,16 @@ const AppRoutes = () => {
           }
         />
         <Route
+          path="messages"
+          element={
+            <ProtectedRoute>
+              <Messages />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="profile"
+
           element={
             <ProtectedRoute>
               <Profile />
