@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   FiCalendar, FiHome, FiHeart, FiCreditCard,
   FiBell, FiCheckCircle, FiXCircle, FiClock, FiSearch,
-  FiArrowRight, FiTrendingUp, FiUser, FiSettings,
+  FiArrowRight, FiTrendingUp, FiUser, FiSettings, FiMessageSquare,
 } from 'react-icons/fi';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -361,6 +361,19 @@ const Dashboard = () => {
           <div>
             <p className="font-semibold text-secondary">Wishlist</p>
             <p className="text-xs text-muted">Saved properties</p>
+          </div>
+          <FiArrowRight className="ml-auto h-4 w-4 text-muted opacity-0 transition group-hover:opacity-100" />
+        </Link>
+        <Link
+          to="/messages"
+          className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:border-primary/20 hover:shadow-md"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 transition group-hover:bg-purple-600 group-hover:text-white">
+            <FiMessageSquare className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="font-semibold text-secondary">Messages</p>
+            <p className="text-xs text-muted">Your conversations</p>
           </div>
           <FiArrowRight className="ml-auto h-4 w-4 text-muted opacity-0 transition group-hover:opacity-100" />
         </Link>

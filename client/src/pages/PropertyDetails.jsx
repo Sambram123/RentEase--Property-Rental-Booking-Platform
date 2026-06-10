@@ -18,6 +18,7 @@ import { geoJsonToLatLng } from '../services/mapsService';
 import { openRazorpayCheckout } from '../utils/razorpayCheckout';
 import { formatPrice, FEATURED_PROPERTIES } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
+import { createConversation } from '../services/messageService';
 
 const AMENITY_ICONS = {
   wifi:         { icon: '📶', label: 'WiFi' },
@@ -691,6 +692,34 @@ const PropertyDetails = () => {
                   <p className="text-sm text-muted">{property.owner.email}</p>
                 </div>
               </div>
+              {/* Contact Owner button */}
+              {isAuthenticated && user?._id !== (property.owner._id || property.owner) && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const conv = await createConversation(
+                        property._id || id,
+                        property.owner._id || property.owner
+                      );
+                      navigate(`/messages?conversation=${conv._id}`);
+                    } catch (err) {
+                      toast.error(err.message || 'Failed to start conversation');
+                    }
+                  }}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-primary bg-primary/5 py-2.5 text-sm font-semibold text-primary transition hover:bg-primary hover:text-white"
+                  id="contact-owner-btn"
+                >
+                  <FiMessageSquare className="h-4 w-4" />
+                  Contact Owner
+                </button>
+              )}
+              {!isAuthenticated && (
+                <p className="mt-3 text-center text-xs text-muted">
+                  <Link to="/login" className="font-medium text-primary hover:underline">Sign in</Link>{' '}
+                  to contact the owner
+                </p>
+              )}
             </div>
           )}
 
