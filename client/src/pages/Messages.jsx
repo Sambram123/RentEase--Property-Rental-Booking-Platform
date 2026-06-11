@@ -4,36 +4,21 @@ import { FiMessageSquare } from 'react-icons/fi';
 import ConversationList from '../components/ConversationList';
 import ChatWindow from '../components/ChatWindow';
 import { useAuth } from '../context/AuthContext';
-import { fetchConversations } from '../services/messageService';
+import { useChat } from '../context/ChatContext';
+import { deleteConversationApi, archiveConversationApi } from '../services/messageService';
 import toast from 'react-hot-toast';
 
 const Messages = () => {
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { conversations, setConversations, loadingConversations, refreshConversations } = useChat();
 
-  const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
   const [mobileShowChat, setMobileShowChat] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
-  // Load conversations
-  const loadConversations = useCallback(async () => {
-    try {
-      const data = await fetchConversations(searchQuery);
-      setConversations(data.conversations || []);
-    } catch (err) {
-      toast.error(err.message || 'Failed to load conversations');
-    } finally {
-      setLoading(false);
-    }
-  }, [searchQuery]);
-
-  useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
-
-  // Auto-select conversation from URL params
+  // Auto-select conversation from URL params (?conversation=id)
   useEffect(() => {
     const convId = searchParams.get('conversation');
     if (convId && conversations.length > 0) {
@@ -45,19 +30,67 @@ const Messages = () => {
     }
   }, [searchParams, conversations]);
 
+  // If search query changes, reload conversations from backend
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      refreshConversations();
+    }, 300);
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery, showArchived, refreshConversations]);
+
   const handleSelectConversation = (conv) => {
     setActiveConversation(conv);
     setMobileShowChat(true);
+    // Sync to query param
+    setSearchParams({ conversation: conv._id });
   };
 
   const handleBack = () => {
     setMobileShowChat(false);
+    setActiveConversation(null);
+    setSearchParams({});
   };
 
-  const handleMessageSent = () => {
-    // Refresh conversation list to update lastMessage
-    loadConversations();
+  const handleDeleteConversation = async (conversationId) => {
+    if (!window.confirm('Are you sure you want to delete this conversation? This will delete all messages.')) return;
+    try {
+      await deleteConversationApi(conversationId);
+      setConversations((prev) => prev.filter((c) => c._id !== conversationId));
+      if (activeConversation?._id === conversationId) {
+        setActiveConversation(null);
+        setMobileShowChat(false);
+        setSearchParams({});
+      }
+      toast.success('Conversation deleted successfully');
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete conversation');
+    }
   };
+
+  const handleArchiveConversation = async (conversationId, archive) => {
+    try {
+      await archiveConversationApi(conversationId, archive);
+      setConversations((prev) => prev.filter((c) => c._id !== conversationId));
+      if (activeConversation?._id === conversationId) {
+        setActiveConversation(null);
+        setMobileShowChat(false);
+        setSearchParams({});
+      }
+      toast.success(archive ? 'Conversation archived' : 'Conversation unarchived');
+    } catch (err) {
+      toast.error(err.message || 'Failed to archive conversation');
+    }
+  };
+
+  // Filter conversations locally by search query if needed as fallback, or use raw list
+  const filteredConversations = conversations.filter((c) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    const otherParticipant = c.participants.find((p) => p._id !== user?._id);
+    const matchUser = otherParticipant?.name?.toLowerCase().includes(q);
+    const matchProperty = c.property?.title?.toLowerCase().includes(q);
+    return matchUser || matchProperty;
+  });
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -73,13 +106,17 @@ const Messages = () => {
             }`}
           >
             <ConversationList
-              conversations={conversations}
+              conversations={filteredConversations}
               activeId={activeConversation?._id}
               onSelect={handleSelectConversation}
+              onDelete={handleDeleteConversation}
+              onArchive={handleArchiveConversation}
               currentUserId={user?._id}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              loading={loading}
+              loading={loadingConversations}
+              showArchived={showArchived}
+              onToggleArchived={() => setShowArchived(!showArchived)}
             />
           </div>
 
@@ -94,7 +131,7 @@ const Messages = () => {
                 conversation={activeConversation}
                 currentUserId={user?._id}
                 onBack={handleBack}
-                onMessageSent={handleMessageSent}
+                onMessageSent={refreshConversations}
               />
             ) : (
               <div className="flex h-full items-center justify-center bg-gray-50/30">

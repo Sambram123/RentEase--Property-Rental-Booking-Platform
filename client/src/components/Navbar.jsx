@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { getUserAvatar } from '../utils/avatar';
 import { useNotifications, getNotifConfig } from '../context/NotificationContext';
 import { markNotificationRead } from '../services/notificationService';
+import { useChat } from '../context/ChatContext';
 
 const navLinks = [
   { to: '/properties', label: 'Properties' },
@@ -28,6 +29,7 @@ const fmtTime = (d) => {
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const { unreadCount, recentNotifications, decrementUnread } = useNotifications();
+  const { unreadChatCount } = useChat();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
@@ -107,7 +109,15 @@ const Navbar = () => {
                 <span className="flex items-center gap-1"><FiHeart className="h-3.5 w-3.5" /> Wishlist</span>
               </NavLink>
               <NavLink to="/messages" className={linkClass}>
-                <span className="flex items-center gap-1"><FiMessageSquare className="h-3.5 w-3.5" /> Messages</span>
+                <span className="flex items-center gap-1">
+                  <FiMessageSquare className="h-3.5 w-3.5" />
+                  Messages
+                  {unreadChatCount > 0 && (
+                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-white">
+                      {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                    </span>
+                  )}
+                </span>
               </NavLink>
               <NavLink to="/my-payments" className={linkClass}>
                 Payments
@@ -341,7 +351,15 @@ const Navbar = () => {
                   className={linkClass}
                   onClick={() => setMenuOpen(false)}
                 >
-                  <span className="flex items-center gap-1"><FiMessageSquare className="h-3.5 w-3.5" /> Messages</span>
+                  <span className="flex items-center gap-1">
+                    <FiMessageSquare className="h-3.5 w-3.5" />
+                    Messages
+                    {unreadChatCount > 0 && (
+                      <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
+                        {unreadChatCount}
+                      </span>
+                    )}
+                  </span>
                 </NavLink>
                 <NavLink
                   to="/my-payments"
