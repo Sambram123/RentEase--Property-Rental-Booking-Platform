@@ -19,6 +19,8 @@ import { deleteProperty } from '../services/propertyService';
 import { updateBookingStatus } from '../services/bookingService';
 import { formatPrice } from '../utils/constants';
 import ActivityFeed from '../components/ActivityFeed';
+import { useChat } from '../context/ChatContext';
+import { getUserAvatar } from '../utils/avatar';
 
 // ─── Skeleton loader ──────────────────────────────────────────────────────────
 const SkeletonCard = () => (
@@ -37,6 +39,16 @@ const SkeletonChart = () => (
   <div className="animate-pulse rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
     <div className="mb-4 h-5 w-32 rounded bg-gray-100" />
     <div className="h-64 rounded-xl bg-gray-50" />
+  </div>
+);
+
+const SkeletonRow = () => (
+  <div className="animate-pulse flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+    <div className="h-14 w-20 rounded-xl bg-gray-100" />
+    <div className="flex-1 space-y-2">
+      <div className="h-4 w-40 rounded bg-gray-100" />
+      <div className="h-3 w-56 rounded bg-gray-100" />
+    </div>
   </div>
 );
 
@@ -78,11 +90,26 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const fmtDate = (d) =>
   new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
+const fmtTime = (d) => {
+  const now = new Date();
+  const date = new Date(d);
+  const diff = now - date;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+};
+
 // ─── Owner Dashboard ──────────────────────────────────────────────────────────
 const OwnerDashboard = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading, token } = useAuth();
   const navigate = useNavigate();
   const isOwnerOrAdmin = ['owner', 'admin'].includes(user?.role);
+  const { conversations, onlineUsers, loadingConversations } = useChat();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -98,7 +125,7 @@ const OwnerDashboard = () => {
   }, [isOwnerOrAdmin, navigate]);
 
   useEffect(() => {
-    if (!isOwnerOrAdmin) return;
+    if (authLoading || !token || !isOwnerOrAdmin) return;
     const load = async () => {
       try {
         const [result, profile] = await Promise.all([
@@ -114,7 +141,7 @@ const OwnerDashboard = () => {
       }
     };
     load();
-  }, [isOwnerOrAdmin]);
+  }, [authLoading, token, isOwnerOrAdmin]);
 
   // ── Delete property ───────────────────────────────────────────────────────
   const handleDeleteProperty = async (id, title) => {
@@ -414,7 +441,7 @@ const OwnerDashboard = () => {
         </section>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid gap-8 lg:grid-cols-3">
         {/* ── Recent Bookings ──────────────────────────────────────── */}
         <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
@@ -514,6 +541,84 @@ const OwnerDashboard = () => {
                   <p className="text-sm font-bold text-emerald-600">{formatPrice(pmt.amount)}</p>
                 </div>
               ))}
+            </div>
+          )}
+        </section>
+
+        {/* ── Recent Chats (Messaging Widget) ─────────────────────── */}
+        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-secondary">Recent Chats</h2>
+            <Link
+              to="/messages"
+              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark"
+            >
+              View all <FiArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          {loadingConversations ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)}
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-center">
+              <FiMessageSquare className="h-10 w-10 text-gray-200" />
+              <p className="mt-3 text-sm font-medium text-secondary">No chats yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {conversations.slice(0, 3).map((conv) => {
+                const otherParticipant = conv.participants.find((p) => p._id !== user._id);
+                const isOnline = onlineUsers.get(otherParticipant?._id.toString())?.isOnline ?? false;
+                const unreadCount = conv.unreadCounts?.get?.(user._id) ?? conv.unreadCounts?.[user._id] ?? 0;
+                const avatar = otherParticipant ? getUserAvatar(otherParticipant) : '';
+
+                return (
+                  <Link
+                    key={conv._id}
+                    to={`/messages?id=${conv._id}`}
+                    className="flex items-center gap-3 rounded-xl border border-gray-50 bg-gray-50/30 p-3 transition hover:bg-gray-50"
+                  >
+                    <div className="relative shrink-0">
+                      {avatar ? (
+                        <img
+                          src={avatar}
+                          alt={otherParticipant?.name}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
+                          {otherParticipant?.name?.charAt(0)}
+                        </div>
+                      )}
+                      {isOnline && (
+                        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="truncate text-sm font-semibold text-secondary">
+                          {otherParticipant?.name || 'User'}
+                        </p>
+                        <span className="text-[10px] text-muted">
+                          {conv.lastMessageAt ? fmtTime(conv.lastMessageAt) : ''}
+                        </span>
+                      </div>
+                      <p className="truncate text-xs font-medium text-primary">
+                        {conv.property?.title || 'Property'}
+                      </p>
+                      <p className="truncate text-xs text-muted">
+                        {conv.lastMessage || 'No messages yet'}
+                      </p>
+                    </div>
+                    {unreadCount > 0 && (
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </section>

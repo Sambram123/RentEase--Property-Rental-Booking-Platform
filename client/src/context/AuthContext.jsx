@@ -39,18 +39,6 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken]     = useState(() => localStorage.getItem(TOKEN_KEY) || null);
   const [loading, setLoading] = useState(true); // true until Firebase resolves
 
-  // ── Attach JWT to every axios request ──────────────────────────────────────
-  useEffect(() => {
-    const interceptorId = api.interceptors.request.use((config) => {
-      const storedToken = getStoredToken();
-      if (storedToken) {
-        config.headers.Authorization = `Bearer ${storedToken}`;
-      }
-      return config;
-    });
-    return () => api.interceptors.request.eject(interceptorId);
-  }, [token]);
-
   // ── Sync our own user state when backend returns a profile ─────────────────
   const syncBackendUser = useCallback(async (backendPayload) => {
     const { token: jwt, user: backendUser } = backendPayload;
