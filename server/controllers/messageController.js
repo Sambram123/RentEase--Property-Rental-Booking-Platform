@@ -2,7 +2,8 @@ import asyncHandler from '../utils/asyncHandler.js';
 import Conversation from '../models/Conversation.js';
 import Message from '../models/Message.js';
 import Property from '../models/Property.js';
-import { emitToUser } from '../socket/socketServer.js';
+import User from '../models/User.js';
+import { emitToUser, isUserOnline } from '../socket/socketServer.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/messages/conversation — Create or get existing conversation
@@ -34,10 +35,16 @@ export const createConversation = asyncHandler(async (req, res) => {
     property: propertyId,
     participants: { $all: [senderId, receiverId] },
   })
-    .populate('participants', 'name email avatar role')
+    .populate('participants', 'name email avatar role lastSeen')
     .populate('property', 'title images price city');
 
   if (existing) {
+    // If archived by either user, unarchive it
+    if (existing.archivedBy && existing.archivedBy.length > 0) {
+      existing.archivedBy = [];
+      await existing.save();
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Conversation found',
@@ -53,10 +60,11 @@ export const createConversation = asyncHandler(async (req, res) => {
       [senderId, 0],
       [receiverId, 0],
     ]),
+    archivedBy: [],
   });
 
   const populated = await Conversation.findById(conversation._id)
-    .populate('participants', 'name email avatar role')
+    .populate('participants', 'name email avatar role lastSeen')
     .populate('property', 'title images price city');
 
   res.status(201).json({
@@ -71,12 +79,19 @@ export const createConversation = asyncHandler(async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const getConversations = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const { search } = req.query;
+  const { search, archived = 'false' } = req.query;
 
   const filter = { participants: userId };
 
+  // Apply archive filtering
+  if (archived === 'true') {
+    filter.archivedBy = userId;
+  } else {
+    filter.archivedBy = { $ne: userId };
+  }
+
   const conversations = await Conversation.find(filter)
-    .populate('participants', 'name email avatar role')
+    .populate('participants', 'name email avatar role lastSeen')
     .populate('property', 'title images price city')
     .sort({ lastMessageAt: -1 })
     .lean();
@@ -98,7 +113,7 @@ export const getConversations = asyncHandler(async (req, res) => {
   // Compute total unread
   const totalUnread = filtered.reduce((sum, c) => {
     const count = c.unreadCounts?.get?.(userId.toString()) ??
-                  c.unreadCounts?.[userId.toString()] ?? 0;
+      c.unreadCounts?.[userId.toString()] ?? 0;
     return sum + count;
   }, 0);
 
@@ -121,7 +136,7 @@ export const getConversationMessages = asyncHandler(async (req, res) => {
 
   // Verify user is a participant
   const conversation = await Conversation.findById(id)
-    .populate('participants', 'name email avatar role')
+    .populate('participants', 'name email avatar role lastSeen')
     .populate('property', 'title images price city');
 
   if (!conversation) {
@@ -200,19 +215,26 @@ export const sendMessage = asyncHandler(async (req, res) => {
     (p) => p.toString() !== senderId.toString()
   );
 
+  if (!receiverId) {
+    res.status(400);
+    throw new Error('Receiver not found in conversation participants');
+  }
+
+  const receiverOnline = isUserOnline(receiverId.toString());
+
   // Create message
   const newMessage = await Message.create({
     conversation: conversationId,
     sender: senderId,
     receiver: receiverId,
     message: message.trim(),
-    status: 'sent',
+    status: receiverOnline ? 'delivered' : 'sent',
   });
 
-  // Update conversation
+  // Update conversation last message details, unread counts, and reset archives
   const receiverKey = receiverId.toString();
   const currentUnread = conversation.unreadCounts?.get?.(receiverKey) ??
-                        conversation.unreadCounts?.[receiverKey] ?? 0;
+    conversation.unreadCounts?.[receiverKey] ?? 0;
 
   conversation.lastMessage = message.trim().substring(0, 100);
   conversation.lastMessageAt = new Date();
@@ -220,6 +242,8 @@ export const sendMessage = asyncHandler(async (req, res) => {
     conversation.unreadCounts = new Map();
   }
   conversation.unreadCounts.set(receiverKey, currentUnread + 1);
+  conversation.archivedBy = []; // Unarchive for both upon new message
+
   await conversation.save();
 
   // Populate for response
@@ -228,13 +252,34 @@ export const sendMessage = asyncHandler(async (req, res) => {
     .populate('receiver', 'name email avatar')
     .lean();
 
-  // Real-time notification via Socket.IO
+  // Real-time notifications via Socket.IO
   const io = req.app.get('io');
   if (io) {
-    emitToUser(io, receiverId.toString(), 'new_message', {
-      message: populated,
+    // Emit receive_message event to the conversation room
+    io.to(`conversation_${conversationId}`).emit('receive_message', populated);
+
+    // Notify receiver about conversation updates (for sidebar preview)
+    emitToUser(io, receiverId.toString(), 'conversation_updated', {
       conversationId,
+      message: populated,
+      unreadCount: currentUnread + 1,
     });
+
+    // Notify sender about conversation updates (for sidebar preview sync on other tabs)
+    emitToUser(io, senderId.toString(), 'conversation_updated', {
+      conversationId,
+      message: populated,
+      unreadCount: 0,
+    });
+
+    // Emit updated total unread count to receiver
+    const receiverConversations = await Conversation.find({ participants: receiverId }).lean();
+    const receiverTotalUnread = receiverConversations.reduce((sum, c) => {
+      const count = c.unreadCounts?.get?.(receiverKey) ??
+        c.unreadCounts?.[receiverKey] ?? 0;
+      return sum + count;
+    }, 0);
+    emitToUser(io, receiverId.toString(), 'unread_count', { count: receiverTotalUnread });
   }
 
   res.status(201).json({
@@ -282,15 +327,19 @@ export const markMessagesRead = asyncHandler(async (req, res) => {
   // Notify sender that messages were read
   const io = req.app.get('io');
   if (io) {
-    const otherUserId = conversation.participants.find(
-      (p) => p.toString() !== userId.toString()
-    );
-    if (otherUserId) {
-      emitToUser(io, otherUserId.toString(), 'messages_read', {
-        conversationId,
-        readBy: userId.toString(),
-      });
-    }
+    io.to(`conversation_${conversationId}`).emit('messages_read', {
+      conversationId,
+      readBy: userId.toString(),
+    });
+
+    // Also emit global unread count update to user
+    const userConversations = await Conversation.find({ participants: userId }).lean();
+    const totalUnread = userConversations.reduce((sum, c) => {
+      const count = c.unreadCounts?.get?.(userKey) ??
+        c.unreadCounts?.[userKey] ?? 0;
+      return sum + count;
+    }, 0);
+    emitToUser(io, userId.toString(), 'unread_count', { count: totalUnread });
   }
 
   res.status(200).json({
@@ -308,6 +357,7 @@ export const deleteMessage = asyncHandler(async (req, res) => {
 
   const message = await Message.findById(messageId);
   if (!message) {
+    // If not found, return 200/404 safely
     res.status(404);
     throw new Error('Message not found');
   }
@@ -318,24 +368,34 @@ export const deleteMessage = asyncHandler(async (req, res) => {
     throw new Error('You can only delete your own messages');
   }
 
+  const conversationId = message.conversation;
   await Message.findByIdAndDelete(messageId);
 
   // Update lastMessage on conversation if this was the last message
   const latestMessage = await Message.findOne({
-    conversation: message.conversation,
+    conversation: conversationId,
   })
     .sort({ createdAt: -1 })
     .lean();
 
   if (latestMessage) {
-    await Conversation.findByIdAndUpdate(message.conversation, {
+    await Conversation.findByIdAndUpdate(conversationId, {
       lastMessage: latestMessage.message.substring(0, 100),
       lastMessageAt: latestMessage.createdAt,
     });
   } else {
-    await Conversation.findByIdAndUpdate(message.conversation, {
+    await Conversation.findByIdAndUpdate(conversationId, {
       lastMessage: '',
       lastMessageAt: new Date(),
+    });
+  }
+
+  // Notify receiver about message deletion in real-time
+  const io = req.app.get('io');
+  if (io) {
+    io.to(`conversation_${conversationId}`).emit('message_deleted', {
+      messageId,
+      conversationId,
     });
   }
 
@@ -355,12 +415,130 @@ export const getUnreadCount = asyncHandler(async (req, res) => {
 
   const totalUnread = conversations.reduce((sum, c) => {
     const count = c.unreadCounts?.get?.(userId) ??
-                  c.unreadCounts?.[userId] ?? 0;
+      c.unreadCounts?.[userId] ?? 0;
     return sum + count;
   }, 0);
 
   res.status(200).json({
     success: true,
     data: { count: totalUnread },
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/messages/conversation/:conversationId — Delete conversation
+// ─────────────────────────────────────────────────────────────────────────────
+export const deleteConversation = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { conversationId } = req.params;
+
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) {
+    res.status(404);
+    throw new Error('Conversation not found');
+  }
+
+  // Verify participation
+  const isParticipant = conversation.participants.some(
+    (p) => p.toString() === userId.toString()
+  );
+  if (!isParticipant) {
+    res.status(403);
+    throw new Error('You are not authorized to delete this conversation');
+  }
+
+  // Delete all messages in the conversation
+  await Message.deleteMany({ conversation: conversationId });
+
+  // Delete the conversation itself
+  await Conversation.findByIdAndDelete(conversationId);
+
+  // Notify other participant about deletion
+  const io = req.app.get('io');
+  if (io) {
+    const otherUserId = conversation.participants.find(
+      (p) => p.toString() !== userId.toString()
+    );
+    if (otherUserId) {
+      emitToUser(io, otherUserId.toString(), 'conversation_deleted', {
+        conversationId,
+      });
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Conversation and all associated messages deleted successfully',
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/messages/conversation/:conversationId/archive — Archive conversation
+// ─────────────────────────────────────────────────────────────────────────────
+export const archiveConversation = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { conversationId } = req.params;
+  const { archive = true } = req.body;
+
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) {
+    res.status(404);
+    throw new Error('Conversation not found');
+  }
+
+  // Verify participation
+  const isParticipant = conversation.participants.some(
+    (p) => p.toString() === userId.toString()
+  );
+  if (!isParticipant) {
+    res.status(403);
+    throw new Error('You are not authorized to modify this conversation');
+  }
+
+  if (archive) {
+    // Add to archivedBy list if not present
+    if (!conversation.archivedBy.includes(userId)) {
+      conversation.archivedBy.push(userId);
+    }
+  } else {
+    // Remove from archivedBy list
+    conversation.archivedBy = conversation.archivedBy.filter(
+      (id) => id.toString() !== userId.toString()
+    );
+  }
+
+  await conversation.save();
+
+  res.status(200).json({
+    success: true,
+    message: archive ? 'Conversation archived successfully' : 'Conversation unarchived successfully',
+    data: conversation,
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/messages/presence/:userId — Get target user online presence & last seen
+// ─────────────────────────────────────────────────────────────────────────────
+export const getUserPresence = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  const targetUser = await User.findById(userId).select('name avatar role lastSeen');
+  if (!targetUser) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  const online = isUserOnline(userId);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      userId: targetUser._id,
+      name: targetUser.name,
+      avatar: targetUser.avatar,
+      role: targetUser.role,
+      isOnline: online,
+      lastSeen: targetUser.lastSeen,
+    },
   });
 });

@@ -8,6 +8,9 @@ import {
   markMessagesRead,
   deleteMessage,
   getUnreadCount,
+  deleteConversation,
+  archiveConversation,
+  getUserPresence,
 } from '../controllers/messageController.js';
 
 const router = Router();
@@ -22,5 +25,10 @@ router.post('/send', sendMessage);
 router.put('/read/:conversationId', markMessagesRead);
 router.get('/unread-count', getUnreadCount);
 router.delete('/:messageId', deleteMessage);
+
+// New chat platform routes
+router.delete('/conversation/:conversationId', deleteConversation);
+router.put('/conversation/:conversationId/archive', archiveConversation);
+router.get('/presence/:userId', getUserPresence);
 
 export default router;

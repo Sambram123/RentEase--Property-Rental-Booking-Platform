@@ -7,8 +7,8 @@ export const createConversation = async (propertyId, receiverId) => {
 };
 
 // ─── Fetch conversations ──────────────────────────────────────────────────────
-export const fetchConversations = async (search = '') => {
-  const params = {};
+export const fetchConversations = async (search = '', archived = false) => {
+  const params = { archived: archived ? 'true' : 'false' };
   if (search) params.search = search;
   const { data } = await api.get('/messages/conversations', { params });
   return data.data; // { conversations, totalUnread }
@@ -44,4 +44,22 @@ export const deleteMessage = async (messageId) => {
 export const fetchMessageUnreadCount = async () => {
   const { data } = await api.get('/messages/unread-count');
   return data.data.count;
+};
+
+// ─── Delete conversation ──────────────────────────────────────────────────────
+export const deleteConversationApi = async (conversationId) => {
+  const { data } = await api.delete(`/messages/conversation/${conversationId}`);
+  return data;
+};
+
+// ─── Archive/Unarchive conversation ───────────────────────────────────────────
+export const archiveConversationApi = async (conversationId, archive = true) => {
+  const { data } = await api.put(`/messages/conversation/${conversationId}/archive`, { archive });
+  return data;
+};
+
+// ─── Fetch user presence and last seen ────────────────────────────────────────
+export const fetchUserPresence = async (userId) => {
+  const { data } = await api.get(`/messages/presence/${userId}`);
+  return data.data; // { userId, name, avatar, role, isOnline, lastSeen }
 };

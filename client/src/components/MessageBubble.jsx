@@ -1,10 +1,41 @@
-import { FiUser, FiCheck, FiCheckCircle } from 'react-icons/fi';
+import { FiUser, FiCheck } from 'react-icons/fi';
 
 const fmtTime = (d) =>
   new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
 const fmtDate = (d) =>
   new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+const StatusReceipt = ({ status, isRead }) => {
+  const currentStatus = isRead || status === 'read' ? 'read' : status;
+
+  if (currentStatus === 'read') {
+    return (
+      <span className="inline-flex text-sky-200" title="Read">
+        <span className="flex">
+          <FiCheck className="h-3.5 w-3.5 -mr-2" />
+          <FiCheck className="h-3.5 w-3.5" />
+        </span>
+      </span>
+    );
+  }
+  if (currentStatus === 'delivered') {
+    return (
+      <span className="inline-flex text-white/40" title="Delivered">
+        <span className="flex">
+          <FiCheck className="h-3.5 w-3.5 -mr-2" />
+          <FiCheck className="h-3.5 w-3.5" />
+        </span>
+      </span>
+    );
+  }
+  // 'sent' or default
+  return (
+    <span className="inline-flex text-white/40" title="Sent">
+      <FiCheck className="h-3.5 w-3.5" />
+    </span>
+  );
+};
 
 const MessageBubble = ({ message, isOwn, onDelete }) => {
   const sender = message.sender;
@@ -30,11 +61,10 @@ const MessageBubble = ({ message, isOwn, onDelete }) => {
 
       {/* Bubble */}
       <div
-        className={`group relative max-w-[75%] rounded-2xl px-4 py-2.5 ${
-          isOwn
+        className={`group relative max-w-[75%] rounded-2xl px-4 py-2.5 ${isOwn
             ? 'bg-primary text-white rounded-br-md'
             : 'bg-gray-100 text-secondary rounded-bl-md'
-        }`}
+          }`}
       >
         <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
           {message.message}
@@ -44,13 +74,7 @@ const MessageBubble = ({ message, isOwn, onDelete }) => {
             {fmtTime(message.createdAt)}
           </span>
           {isOwn && (
-            <span className={`${message.isRead || message.status === 'read' ? 'text-white' : 'text-white/40'}`}>
-              {message.isRead || message.status === 'read' ? (
-                <FiCheckCircle className="h-3 w-3" />
-              ) : (
-                <FiCheck className="h-3 w-3" />
-              )}
-            </span>
+            <StatusReceipt status={message.status} isRead={message.isRead} />
           )}
         </div>
 
@@ -74,7 +98,7 @@ const MessageBubble = ({ message, isOwn, onDelete }) => {
 export const DateSeparator = ({ date }) => (
   <div className="flex items-center gap-3 py-2">
     <div className="flex-1 border-t border-gray-100" />
-    <span className="text-[10px] font-medium text-muted bg-white px-2">
+    <span className="text-[10px] font-medium text-muted bg-white px-2 rounded-full border border-gray-50 py-0.5">
       {fmtDate(date)}
     </span>
     <div className="flex-1 border-t border-gray-100" />
