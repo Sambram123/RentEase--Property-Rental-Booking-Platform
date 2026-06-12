@@ -1,6 +1,7 @@
 import asyncHandler from '../utils/asyncHandler.js';
 import Booking from '../models/Booking.js';
 import Property from '../models/Property.js';
+import Availability from '../models/Availability.js';
 import {
   notifyBookingCreated,
   notifyBookingConfirmed,
@@ -84,6 +85,13 @@ const createBooking = asyncHandler(async (req, res) => {
   if (conflict) {
     res.status(409);
     throw new Error('These dates are already booked. Please choose different dates.');
+  }
+
+  // ── Check availability blocks ──────────────────────────────────────────────
+  const avail = await Availability.findOne({ property: propertyId });
+  if (avail && avail.isRangeBlocked(checkIn, checkOut)) {
+    res.status(409);
+    throw new Error('These dates are blocked by the owner. Please choose different dates.');
   }
 
   // ── Calculate amount ───────────────────────────────────────────────────────

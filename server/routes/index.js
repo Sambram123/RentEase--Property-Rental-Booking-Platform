@@ -10,6 +10,7 @@ import dashboardRoutes from './dashboardRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import messageRoutes from './messageRoutes.js';
 import testRoutes from './testRoutes.js';
+import availabilityRoutes from './availabilityRoutes.js';
 
 const registerRoutes = (app) => {
   app.get('/api/health', (req, res) => {
@@ -30,6 +31,7 @@ const registerRoutes = (app) => {
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/messages', messageRoutes);
+  app.use('/api/availability', availabilityRoutes);
   app.use('/api/test', testRoutes);
 };
 
