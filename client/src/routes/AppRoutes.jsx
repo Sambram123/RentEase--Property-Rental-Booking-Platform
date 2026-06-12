@@ -20,6 +20,7 @@ import Messages from '../pages/Messages';
 import Profile from '../pages/Profile';
 import Settings from '../pages/Settings';
 import NotFound from '../pages/NotFound';
+import AvailabilityCalendar from '../pages/AvailabilityCalendar';
 import ProtectedRoute from '../components/ProtectedRoute';
 import AdminRoute from '../components/AdminRoute';
 
@@ -139,6 +140,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={['owner', 'admin']}>
               <OwnerDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="availability/:propertyId"
+          element={
+            <ProtectedRoute allowedRoles={['owner', 'admin']}>
+              <AvailabilityCalendar />
             </ProtectedRoute>
           }
         />
