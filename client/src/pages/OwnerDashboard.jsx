@@ -5,7 +5,6 @@ import {
   FiEye, FiToggleLeft, FiToggleRight, FiCheckCircle,
   FiXCircle, FiClock, FiUser, FiCreditCard, FiDollarSign,
   FiBell, FiStar, FiTrendingUp, FiArrowRight, FiBarChart2, FiSettings, FiMessageSquare,
-  FiPercent, FiLock,
 } from 'react-icons/fi';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -18,7 +17,6 @@ import { getProfile } from '../services/userService';
 import ProfileCard from '../components/ProfileCard';
 import { deleteProperty } from '../services/propertyService';
 import { updateBookingStatus } from '../services/bookingService';
-import { fetchOccupancyAnalytics } from '../services/availabilityService';
 import { formatPrice } from '../utils/constants';
 import ActivityFeed from '../components/ActivityFeed';
 import BookingTimeline from '../components/BookingTimeline';
@@ -119,7 +117,6 @@ const OwnerDashboard = () => {
   const [profileData, setProfileData] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [updatingBk, setUpdatingBk] = useState(null);
-  const [occupancy, setOccupancy] = useState([]);
   const [showTimeline, setShowTimeline] = useState(false);
 
   // Redirect non-owners to /dashboard
@@ -133,14 +130,12 @@ const OwnerDashboard = () => {
     if (authLoading || !token || !isOwnerOrAdmin) return;
     const load = async () => {
       try {
-        const [result, profile, occ] = await Promise.all([
+        const [result, profile] = await Promise.all([
           fetchOwnerDashboard(),
           getProfile().catch(() => null),
-          fetchOccupancyAnalytics().catch(() => []),
         ]);
         setData(result);
         if (profile) setProfileData(profile);
-        setOccupancy(occ || []);
       } catch {
         // silently skip
       } finally {
@@ -275,70 +270,6 @@ const OwnerDashboard = () => {
           />
           <StatCard icon={FiClock} label="Pending bookings" value={stats.pendingBookings || 0} color="bg-amber-50 text-amber-600" />
         </div>
-      )}
-
-      {/* ── Occupancy Metrics ────────────────────────────────────────── */}
-      {!loading && occupancy.length > 0 && (
-        <section className="mb-10">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-xl font-bold text-secondary">
-              <FiPercent className="h-5 w-5 text-primary" /> Occupancy Analytics
-            </h2>
-          </div>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {occupancy.map((item) => (
-              <div key={item.property._id} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-md">
-                <div className="relative">
-                  <img
-                    src={Array.isArray(item.property.images) && item.property.images[0]
-                      ? item.property.images[0]
-                      : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60'}
-                    alt={item.property.title}
-                    className="h-24 w-full object-cover"
-                    onError={e => { e.currentTarget.src = 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60'; }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/60 to-transparent">
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-white">{item.occupancyPercent}%</p>
-                      <p className="text-xs text-white/80">Occupancy</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <p className="line-clamp-1 font-semibold text-secondary">{item.property.title}</p>
-                  <p className="mb-3 text-xs text-muted">{item.property.city}</p>
-                  {/* Progress bar */}
-                  <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500"
-                      style={{ width: `${item.occupancyPercent}%` }}
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-lg bg-blue-50/50 p-2">
-                      <p className="text-sm font-bold text-blue-600">{item.bookedDays}</p>
-                      <p className="text-[10px] text-muted">Booked</p>
-                    </div>
-                    <div className="rounded-lg bg-red-50/50 p-2">
-                      <p className="text-sm font-bold text-red-500">{item.blockedDays}</p>
-                      <p className="text-[10px] text-muted">Blocked</p>
-                    </div>
-                    <div className="rounded-lg bg-green-50/50 p-2">
-                      <p className="text-sm font-bold text-green-600">{item.availableDays}</p>
-                      <p className="text-[10px] text-muted">Available</p>
-                    </div>
-                  </div>
-                  <Link
-                    to={`/availability/${item.property._id}`}
-                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-primary/20 py-2 text-xs font-medium text-primary transition hover:bg-primary hover:text-white"
-                  >
-                    <FiCalendar className="h-3.5 w-3.5" /> Manage Calendar
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
       )}
 
       {/* ── Revenue & Booking Stats Row ─────────────────────────────── */}
@@ -479,6 +410,12 @@ const OwnerDashboard = () => {
                     </div>
 
                     <div className="mt-3 flex items-center gap-2">
+                      <Link
+                        to={`/availability/${prop._id}`}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-primary/20 py-2 text-xs font-medium text-primary transition hover:bg-primary hover:text-white"
+                      >
+                        <FiCalendar className="h-3.5 w-3.5" /> Manage Calendar
+                      </Link>
                       <Link
                         to={`/properties/${prop._id}`}
                         className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2 text-xs font-medium text-secondary transition hover:bg-gray-50"
