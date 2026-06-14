@@ -46,6 +46,7 @@ const INITIAL_FORM = {
   amenities: [],
   imageUrls: '', // comma-separated URLs for now
   availability: true,
+  cancellationPolicy: 'moderate',
 };
 
 // ─── Section header ──────────────────────────────────────────────────────────
@@ -133,11 +134,12 @@ const AddProperty = () => {
         country: form.country.trim(),
         zipCode: form.zipCode.trim(),
       },
-      bedrooms:     Number(form.bedrooms),
-      bathrooms:    Number(form.bathrooms),
-      amenities:    form.amenities,
+      bedrooms:            Number(form.bedrooms),
+      bathrooms:           Number(form.bathrooms),
+      amenities:           form.amenities,
       images,
-      availability: form.availability,
+      availability:        form.availability,
+      cancellationPolicy:  form.cancellationPolicy,
       // GeoJSON — [lng, lat] order per MongoDB convention
       ...(coords && {
         location: {
@@ -308,6 +310,40 @@ const AddProperty = () => {
               Available for rent
             </span>
           </label>
+
+          {/* Cancellation Policy */}
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-medium text-secondary">
+              Cancellation policy
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: 'flexible', label: '🟢 Flexible', desc: 'Full refund ≥7 days' },
+                { value: 'moderate', label: '🟡 Moderate', desc: 'Partial refund ≥14 days' },
+                { value: 'strict',   label: '🔴 Strict',   desc: '50% refund ≥30 days' },
+              ].map((p) => (
+                <label
+                  key={p.value}
+                  className={`cursor-pointer rounded-xl border p-3 text-center transition ${
+                    form.cancellationPolicy === p.value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="cancellationPolicy"
+                    value={p.value}
+                    checked={form.cancellationPolicy === p.value}
+                    onChange={handleChange}
+                    className="sr-only"
+                  />
+                  <p className="text-sm font-semibold text-secondary">{p.label}</p>
+                  <p className="mt-0.5 text-xs text-muted">{p.desc}</p>
+                </label>
+              ))}
+            </div>
+          </div>
         </section>
 
         {/* ── Address ───────────────────────────────────────────────────── */}

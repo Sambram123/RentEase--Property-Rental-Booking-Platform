@@ -53,6 +53,32 @@ const bookingSchema = new mongoose.Schema(
       },
       default: 'pending',
     },
+
+    cancellationStatus: {
+      type: String,
+      enum: {
+        values: ['none', 'requested', 'processed'],
+        message: '{VALUE} is not a valid cancellation status',
+      },
+      default: 'none',
+    },
+
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+
+    cancellationReason: {
+      type: String,
+      maxlength: 500,
+      default: null,
+    },
+
+    cancelledBy: {
+      type: String,
+      enum: ['tenant', 'owner', 'admin', null],
+      default: null,
+    },
   },
   {
     timestamps: true,

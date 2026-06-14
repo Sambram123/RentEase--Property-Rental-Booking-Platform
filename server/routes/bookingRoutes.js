@@ -8,6 +8,10 @@ import {
   deleteBooking,
   getOwnerAllBookings,
 } from '../controllers/bookingController.js';
+import {
+  cancelBooking,
+  getRefundEstimate,
+} from '../controllers/refundController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -33,6 +37,12 @@ router.get('/:id', protect, getBookingById);
 
 // PUT /api/bookings/:id/status — update booking status
 router.put('/:id/status', protect, updateBookingStatus);
+
+// POST /api/bookings/:id/cancel — cancel booking + create refund
+router.post('/:id/cancel', protect, cancelBooking);
+
+// GET /api/bookings/:id/refund-estimate — refund preview before cancellation
+router.get('/:id/refund-estimate', protect, getRefundEstimate);
 
 // DELETE /api/bookings/:id — delete booking
 router.delete('/:id', protect, deleteBooking);

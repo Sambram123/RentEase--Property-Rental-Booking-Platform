@@ -116,6 +116,15 @@ const propertySchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+
+    cancellationPolicy: {
+      type: String,
+      enum: {
+        values: ['flexible', 'moderate', 'strict'],
+        message: '{VALUE} is not a valid cancellation policy',
+      },
+      default: 'moderate',
+    },
   },
   {
     timestamps: true,

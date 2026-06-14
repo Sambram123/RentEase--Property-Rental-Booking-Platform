@@ -14,6 +14,11 @@ import {
   getReviews,
   deleteReview,
 } from '../controllers/adminController.js';
+import {
+  getOwnerRefunds,
+  updateRefundStatus,
+  getRefundAnalytics,
+} from '../controllers/refundController.js';
 
 const router = Router();
 
@@ -43,5 +48,10 @@ router.get('/payments', getPayments);
 // Reviews
 router.get('/reviews', getReviews);
 router.delete('/reviews/:id', deleteReview);
+
+// Refunds — static routes must come before :id dynamic routes
+router.get('/refunds/analytics', getRefundAnalytics);
+router.get('/refunds', getOwnerRefunds);
+router.put('/refunds/:id/status', updateRefundStatus);
 
 export default router;

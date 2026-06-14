@@ -27,6 +27,10 @@ const notificationSchema = new mongoose.Schema(
           'payment_failed',
           'review_added',
           'property_listed',
+          'refund_requested',
+          'refund_approved',
+          'refund_rejected',
+          'refund_processed',
           'system',
         ],
         message: '{VALUE} is not a valid notification type',
@@ -59,7 +63,7 @@ const notificationSchema = new mongoose.Schema(
 
     referenceType: {
       type: String,
-      enum: ['Booking', 'Payment', 'Property', 'Review', null],
+      enum: ['Booking', 'Payment', 'Property', 'Review', 'Refund', null],
       default: null,
     },
   },

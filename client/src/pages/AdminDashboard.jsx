@@ -3,6 +3,7 @@ import {
   FiUsers, FiHome, FiCalendar, FiDollarSign, FiStar,
   FiBarChart2, FiSearch, FiTrash2, FiEdit, FiCheck,
   FiX, FiChevronLeft, FiChevronRight, FiShield, FiActivity,
+  FiRefreshCw,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import {
@@ -17,6 +18,7 @@ import {
   fetchAdminPayments,
   fetchAdminReviews, deleteAdminReview,
 } from '../services/adminService';
+import { fetchAdminRefunds, updateRefundStatus } from '../services/refundService';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -34,6 +36,7 @@ const TAB_ITEMS = [
   { key: 'bookings', label: 'Bookings', icon: FiCalendar },
   { key: 'payments', label: 'Payments', icon: FiDollarSign },
   { key: 'reviews', label: 'Reviews', icon: FiStar },
+  { key: 'refunds', label: 'Refunds', icon: FiRefreshCw },
 ];
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -109,6 +112,10 @@ const AdminDashboard = () => {
 
   const [reviews, setReviews] = useState({ reviews: [], total: 0, page: 1, pages: 1 });
 
+  // Refund state
+  const [refunds, setRefunds] = useState({ refunds: [], total: 0, page: 1, pages: 1, summary: {} });
+  const [refundStatusFilter, setRefundStatusFilter] = useState('');
+
   // ── Load dashboard ────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
@@ -159,6 +166,13 @@ const AdminDashboard = () => {
     } catch (err) { toast.error(err.message); }
   }, []);
 
+  const loadRefunds = useCallback(async (page = 1) => {
+    try {
+      const data = await fetchAdminRefunds({ page, status: refundStatusFilter });
+      setRefunds(data);
+    } catch (err) { toast.error(err.message); }
+  }, [refundStatusFilter]);
+
   // ── Load on tab switch ─────────────────────────────────────────────────────
   useEffect(() => {
     if (tab === 'users') loadUsers();
@@ -166,7 +180,8 @@ const AdminDashboard = () => {
     else if (tab === 'bookings') loadBookings();
     else if (tab === 'payments') loadPayments();
     else if (tab === 'reviews') loadReviews();
-  }, [tab, loadUsers, loadProperties, loadBookings, loadPayments, loadReviews]);
+    else if (tab === 'refunds') loadRefunds();
+  }, [tab, loadUsers, loadProperties, loadBookings, loadPayments, loadReviews, loadRefunds]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const handleRoleChange = async (id, role) => {
@@ -209,6 +224,14 @@ const AdminDashboard = () => {
       await deleteAdminReview(id);
       toast.success('Review deleted');
       loadReviews(reviews.page);
+    } catch (err) { toast.error(err.message); }
+  };
+
+  const handleRefundStatusChange = async (id, status, note = '') => {
+    try {
+      await updateRefundStatus(id, status, note);
+      toast.success(`Refund ${status}`);
+      loadRefunds(refunds.page);
     } catch (err) { toast.error(err.message); }
   };
 
@@ -733,6 +756,117 @@ const AdminDashboard = () => {
                 </table>
               </div>
               <Pagination page={reviews.page} pages={reviews.pages} onPageChange={(p) => loadReviews(p)} />
+            </div>
+          )}
+
+          {/* ═══════ REFUNDS ═══════ */}
+          {tab === 'refunds' && (
+            <div className="space-y-4">
+              {/* Summary cards */}
+              {refunds.summary && (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <StatCard icon={FiRefreshCw} label="Total Refunds" value={refunds.total || 0} color="#6c5ce7" />
+                  <StatCard icon={FiDollarSign} label="Total Amount" value={`₹${((refunds.summary?.totalRefundAmount || 0)).toLocaleString('en-IN')}`} color="#e17055" />
+                  <StatCard icon={FiActivity} label="Pending" value={refunds.summary?.pendingCount || 0} color="#fdcb6e" />
+                  <StatCard icon={FiCheck} label="Processed" value={refunds.summary?.processedCount || 0} color="#00b894" />
+                </div>
+              )}
+
+              {/* Filter */}
+              <div className="flex gap-3">
+                <select
+                  value={refundStatusFilter}
+                  onChange={(e) => setRefundStatusFilter(e.target.value)}
+                  className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-secondary outline-none transition focus:border-primary"
+                  id="admin-refund-status"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="requested">Requested</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="processed">Processed</option>
+                </select>
+                <button onClick={() => loadRefunds()} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-dark">Filter</button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <th className="px-4 py-3 font-semibold text-muted">Tenant</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Property</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Amount</th>
+                      <th className="px-4 py-3 font-semibold text-muted">%</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Policy</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Requested</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Status</th>
+                      <th className="px-4 py-3 font-semibold text-muted">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {refunds.refunds.map((r) => (
+                      <tr key={r._id} className="border-b border-gray-50 transition hover:bg-gray-50/50">
+                        <td className="px-4 py-3 text-secondary">{r.tenant?.name || '—'}</td>
+                        <td className="px-4 py-3 text-muted">{r.property?.title || '—'}</td>
+                        <td className="px-4 py-3 font-medium text-red-600">₹{(r.refundAmount || 0).toLocaleString('en-IN')}</td>
+                        <td className="px-4 py-3 text-secondary">{r.refundPercentage}%</td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
+                            r.cancellationPolicy === 'flexible' ? 'bg-green-100 text-green-700'
+                              : r.cancellationPolicy === 'moderate' ? 'bg-amber-100 text-amber-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}>{r.cancellationPolicy}</span>
+                        </td>
+                        <td className="px-4 py-3 text-muted">{fmtDate(r.requestedAt)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
+                            r.refundStatus === 'requested' ? 'bg-amber-100 text-amber-700'
+                              : r.refundStatus === 'approved' ? 'bg-green-100 text-green-700'
+                              : r.refundStatus === 'rejected' ? 'bg-red-100 text-red-700'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}>{r.refundStatus}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {r.refundStatus === 'requested' && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleRefundStatusChange(r._id, 'approved')}
+                                title="Approve"
+                                className="rounded-lg p-1.5 text-emerald-500 transition hover:bg-emerald-50 hover:text-emerald-700"
+                                id={`approve-refund-${r._id}`}
+                              >
+                                <FiCheck className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleRefundStatusChange(r._id, 'rejected')}
+                                title="Reject"
+                                className="rounded-lg p-1.5 text-red-400 transition hover:bg-red-50 hover:text-red-600"
+                                id={`reject-refund-${r._id}`}
+                              >
+                                <FiX className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
+                          {r.refundStatus === 'approved' && (
+                            <button
+                              onClick={() => handleRefundStatusChange(r._id, 'processed')}
+                              title="Mark as processed"
+                              className="rounded-lg px-2 py-1 text-[10px] font-medium text-blue-600 hover:bg-blue-50"
+                              id={`process-refund-${r._id}`}
+                            >
+                              Mark processed
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {refunds.refunds.length === 0 && (
+                      <tr><td colSpan={8} className="px-4 py-10 text-center text-muted">No refunds found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination page={refunds.page} pages={refunds.pages} onPageChange={(p) => loadRefunds(p)} />
             </div>
           )}
         </div>

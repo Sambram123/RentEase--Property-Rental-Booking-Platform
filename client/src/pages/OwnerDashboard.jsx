@@ -5,6 +5,7 @@ import {
   FiEye, FiToggleLeft, FiToggleRight, FiCheckCircle,
   FiXCircle, FiClock, FiUser, FiCreditCard, FiDollarSign,
   FiBell, FiStar, FiTrendingUp, FiArrowRight, FiBarChart2, FiSettings, FiMessageSquare,
+  FiRefreshCw, FiAlertCircle,
 } from 'react-icons/fi';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -17,6 +18,7 @@ import { getProfile } from '../services/userService';
 import ProfileCard from '../components/ProfileCard';
 import { deleteProperty } from '../services/propertyService';
 import { updateBookingStatus } from '../services/bookingService';
+import { fetchOwnerRefunds, updateRefundStatus } from '../services/refundService';
 import { formatPrice } from '../utils/constants';
 import ActivityFeed from '../components/ActivityFeed';
 import BookingTimeline from '../components/BookingTimeline';
@@ -118,6 +120,8 @@ const OwnerDashboard = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [updatingBk, setUpdatingBk] = useState(null);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [refundData, setRefundData] = useState(null);
+  const [updatingRefund, setUpdatingRefund] = useState(null);
 
   // Redirect non-owners to /dashboard
   useEffect(() => {
@@ -130,12 +134,14 @@ const OwnerDashboard = () => {
     if (authLoading || !token || !isOwnerOrAdmin) return;
     const load = async () => {
       try {
-        const [result, profile] = await Promise.all([
+        const [result, profile, refunds] = await Promise.all([
           fetchOwnerDashboard(),
           getProfile().catch(() => null),
+          fetchOwnerRefunds({ limit: 10 }).catch(() => null),
         ]);
         setData(result);
         if (profile) setProfileData(profile);
+        if (refunds) setRefundData(refunds);
       } catch {
         // silently skip
       } finally {
@@ -182,6 +188,25 @@ const OwnerDashboard = () => {
     }
   };
 
+  // ── Handle refund status update (owner can see, admin can change) ─────────
+  const handleRefundStatus = async (refundId, status) => {
+    setUpdatingRefund(refundId);
+    try {
+      await updateRefundStatus(refundId, status);
+      setRefundData((prev) => ({
+        ...prev,
+        refunds: prev.refunds.map((r) =>
+          r._id === refundId ? { ...r, refundStatus: status } : r
+        ),
+      }));
+      toast.success(`Refund ${status}`);
+    } catch (err) {
+      toast.error(err.message || 'Failed to update refund');
+    } finally {
+      setUpdatingRefund(null);
+    }
+  };
+
   if (!isOwnerOrAdmin) return null;
 
   const stats = data?.stats || {};
@@ -189,6 +214,8 @@ const OwnerDashboard = () => {
   const recentPayments = data?.recentPayments || [];
   const recentReviews = data?.recentReviews || [];
   const propertyPerformance = data?.propertyPerformance || [];
+  const ownerRefunds = refundData?.refunds || [];
+  const refundSummary = refundData?.summary || {};
 
   // Format chart data
   const revenueChartData = (data?.revenueTrend || []).map((item) => ({
@@ -739,6 +766,92 @@ const OwnerDashboard = () => {
       <section className="mt-8">
         <ActivityFeed maxItems={6} />
       </section>
+
+      {/* ── Refund Management ─────────────────────────────────────── */}
+      {(ownerRefunds.length > 0 || refundSummary.pendingCount > 0) && (
+        <section className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-secondary">
+              <FiRefreshCw className="h-5 w-5 text-blue-500" /> Refund Management
+            </h2>
+            <div className="flex items-center gap-3">
+              {refundSummary.pendingCount > 0 && (
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                  {refundSummary.pendingCount} pending
+                </span>
+              )}
+              <span className="text-xs text-muted">
+                Total refunds: {formatPrice(refundSummary.totalRefundAmount || 0)}
+              </span>
+            </div>
+          </div>
+
+          {/* Refund stats */}
+          <div className="mb-5 grid grid-cols-3 gap-3">
+            <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3 text-center">
+              <p className="text-xl font-bold text-amber-600">{refundSummary.pendingCount || 0}</p>
+              <p className="text-xs text-muted">Pending</p>
+            </div>
+            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 text-center">
+              <p className="text-xl font-bold text-blue-600">{refundSummary.processedCount || 0}</p>
+              <p className="text-xs text-muted">Processed</p>
+            </div>
+            <div className="rounded-xl border border-red-100 bg-red-50/50 p-3 text-center">
+              <p className="text-sm font-bold text-red-600">{formatPrice(refundSummary.totalRefundAmount || 0)}</p>
+              <p className="text-xs text-muted">Total Refunds</p>
+            </div>
+          </div>
+
+          {/* Refund list */}
+          <div className="space-y-3">
+            {ownerRefunds.map((refund) => {
+              const STATUS_CLS = {
+                requested: 'bg-amber-50 text-amber-700',
+                approved: 'bg-green-50 text-green-700',
+                rejected: 'bg-red-50 text-red-600',
+                processed: 'bg-blue-50 text-blue-700',
+              };
+              return (
+                <div key={refund._id} className="flex items-center gap-4 rounded-xl border border-gray-100 bg-gray-50/40 p-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-secondary line-clamp-1">
+                      {refund.property?.title || 'Property'}
+                    </p>
+                    <p className="text-xs text-muted mt-0.5">
+                      <FiUser className="inline h-3 w-3 mr-1" />
+                      {refund.tenant?.name || 'Tenant'} · {formatPrice(refund.refundAmount)} ({refund.refundPercentage}%)
+                    </p>
+                    <p className="text-xs text-muted">Policy: <span className="capitalize">{refund.cancellationPolicy}</span></p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${STATUS_CLS[refund.refundStatus] || 'bg-gray-100 text-gray-600'}`}>
+                      {refund.refundStatus}
+                    </span>
+                    {isOwnerOrAdmin && refund.refundStatus === 'requested' && user?.role === 'admin' && (
+                      <div className="flex gap-1">
+                        <button
+                          disabled={updatingRefund === refund._id}
+                          onClick={() => handleRefundStatus(refund._id, 'approved')}
+                          className="rounded-lg bg-green-50 px-2 py-1 text-[10px] font-medium text-green-700 hover:bg-green-100 disabled:opacity-50"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          disabled={updatingRefund === refund._id}
+                          onClick={() => handleRefundStatus(refund._id, 'rejected')}
+                          className="rounded-lg bg-red-50 px-2 py-1 text-[10px] font-medium text-red-500 hover:bg-red-100 disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 };

@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   FiCalendar, FiMapPin, FiHome, FiArrowLeft,
-  FiClock, FiCheckCircle, FiXCircle, FiAlertCircle, FiCreditCard,
+  FiClock, FiCheckCircle, FiXCircle, FiAlertCircle,
+  FiCreditCard, FiRefreshCw, FiInfo, FiX, FiAlertTriangle,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
-import { fetchMyBookings, updateBookingStatus } from '../services/bookingService';
+import { fetchMyBookings } from '../services/bookingService';
+import { fetchMyRefunds, fetchRefundEstimate, cancelBookingWithRefund } from '../services/refundService';
 import { createPaymentOrder, verifyPayment } from '../services/paymentService';
 import { openRazorpayCheckout } from '../utils/razorpayCheckout';
 import { useAuth } from '../context/AuthContext';
@@ -17,26 +19,17 @@ const PLACEHOLDER =
 
 // ─── Status badge config ──────────────────────────────────────────────────────
 const STATUS_CONFIG = {
-  pending: {
-    label: 'Pending',
-    icon:  FiClock,
-    cls:   'bg-amber-50 text-amber-600 border-amber-200',
-  },
-  confirmed: {
-    label: 'Confirmed',
-    icon:  FiCheckCircle,
-    cls:   'bg-green-50 text-green-600 border-green-200',
-  },
-  cancelled: {
-    label: 'Cancelled',
-    icon:  FiXCircle,
-    cls:   'bg-red-50 text-red-500 border-red-200',
-  },
-  completed: {
-    label: 'Completed',
-    icon:  FiCheckCircle,
-    cls:   'bg-blue-50 text-blue-600 border-blue-200',
-  },
+  pending:   { label: 'Pending',   icon: FiClock,       cls: 'bg-amber-50 text-amber-600 border-amber-200' },
+  confirmed: { label: 'Confirmed', icon: FiCheckCircle, cls: 'bg-green-50 text-green-600 border-green-200' },
+  cancelled: { label: 'Cancelled', icon: FiXCircle,     cls: 'bg-red-50 text-red-500 border-red-200' },
+  completed: { label: 'Completed', icon: FiCheckCircle, cls: 'bg-blue-50 text-blue-600 border-blue-200' },
+};
+
+const REFUND_STATUS_CONFIG = {
+  requested: { label: 'Refund Requested', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: FiClock },
+  approved:  { label: 'Refund Approved',  cls: 'bg-green-50 text-green-700 border-green-200', icon: FiCheckCircle },
+  rejected:  { label: 'Refund Rejected',  cls: 'bg-red-50 text-red-600 border-red-200',       icon: FiXCircle },
+  processed: { label: 'Refund Processed', cls: 'bg-blue-50 text-blue-700 border-blue-200',    icon: FiRefreshCw },
 };
 
 const PAYMENT_CONFIG = {
@@ -45,11 +38,8 @@ const PAYMENT_CONFIG = {
   failed:  { label: 'Payment failed',  cls: 'text-red-500'  },
 };
 
-// ─── Format date ──────────────────────────────────────────────────────────────
 const fmtDate = (d) =>
-  new Date(d).toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  });
+  new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
 const diffDays = (a, b) =>
   Math.ceil((new Date(b) - new Date(a)) / (1000 * 60 * 60 * 24));
@@ -66,16 +56,191 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+// ─── RefundBadge ──────────────────────────────────────────────────────────────
+const RefundBadge = ({ status }) => {
+  const cfg = REFUND_STATUS_CONFIG[status];
+  if (!cfg) return null;
+  const Icon = cfg.icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${cfg.cls}`}>
+      <Icon className="h-3.5 w-3.5" />
+      {cfg.label}
+    </span>
+  );
+};
+
+// ─── Cancellation Modal ───────────────────────────────────────────────────────
+const CancelModal = ({ booking, estimate, loadingEstimate, onConfirm, onClose, cancelling }) => {
+  const [reason, setReason] = useState('');
+
+  const REASONS = [
+    'Change of plans',
+    'Found a better option',
+    'Financial reasons',
+    'Emergency / personal reasons',
+    'Property not as described',
+    'Other',
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl animate-in fade-in slide-in-from-bottom-4">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50">
+              <FiAlertTriangle className="h-5 w-5 text-red-500" />
+            </div>
+            <h2 className="text-lg font-bold text-secondary">Cancel Booking</h2>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-gray-100">
+            <FiX className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Property info */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-3">
+            <p className="font-semibold text-secondary text-sm">{booking.property?.title}</p>
+            <p className="text-xs text-muted mt-0.5">
+              {fmtDate(booking.checkInDate)} → {fmtDate(booking.checkOutDate)}
+            </p>
+          </div>
+
+          {/* Refund estimate */}
+          {loadingEstimate ? (
+            <div className="flex items-center gap-2 rounded-xl bg-blue-50 p-3 text-sm text-blue-700">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-300 border-t-blue-700" />
+              Calculating refund...
+            </div>
+          ) : estimate ? (
+            <div className={`rounded-xl border p-4 ${estimate.refundPercentage > 0 ? 'border-green-200 bg-green-50' : 'border-red-100 bg-red-50'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <FiInfo className={`h-4 w-4 ${estimate.refundPercentage > 0 ? 'text-green-600' : 'text-red-500'}`} />
+                <p className="text-sm font-semibold text-secondary">Refund Estimate</p>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted">Amount paid</span>
+                  <span className="font-medium text-secondary">{formatPrice(estimate.paidAmount)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted">Refund %</span>
+                  <span className="font-medium text-secondary">{estimate.refundPercentage}%</span>
+                </div>
+                <div className="flex justify-between text-sm border-t border-dashed border-gray-200 pt-1.5 mt-1.5">
+                  <span className="font-semibold text-secondary">Refund amount</span>
+                  <span className={`font-bold text-base ${estimate.refundPercentage > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    {formatPrice(estimate.refundAmount)}
+                  </span>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-muted">{estimate.breakdown}</p>
+              <p className="mt-1 text-xs text-muted">Policy: <span className="capitalize font-medium">{estimate.policy}</span> · {estimate.daysBeforeCheckIn} days before check-in</p>
+            </div>
+          ) : null}
+
+          {/* Reason */}
+          <div>
+            <label className="mb-2 block text-sm font-medium text-secondary">
+              Cancellation reason <span className="text-red-400">*</span>
+            </label>
+            <select
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-secondary outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+              id="cancel-reason"
+            >
+              <option value="">Select a reason…</option>
+              {REASONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 border-t border-gray-100 px-6 py-4">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-secondary transition hover:bg-gray-50"
+          >
+            Keep booking
+          </button>
+          <button
+            onClick={() => onConfirm(reason)}
+            disabled={!reason || cancelling}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600 disabled:opacity-50"
+            id="confirm-cancel-btn"
+          >
+            {cancelling ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            ) : (
+              <FiXCircle className="h-4 w-4" />
+            )}
+            Cancel booking
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Refund Card ──────────────────────────────────────────────────────────────
+const RefundCard = ({ refund }) => {
+  const cfg = REFUND_STATUS_CONFIG[refund.refundStatus] || REFUND_STATUS_CONFIG.requested;
+  const Icon = cfg.icon;
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gradient-to-r from-blue-50/30 to-indigo-50/30 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
+            <FiRefreshCw className="h-4 w-4 text-blue-600" />
+          </div>
+          <p className="text-sm font-semibold text-secondary">Refund Tracking</p>
+        </div>
+        <RefundBadge status={refund.refundStatus} />
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-xs text-muted">Refund Amount</p>
+          <p className="font-bold text-lg text-blue-600">{formatPrice(refund.refundAmount)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted">Refund %</p>
+          <p className="font-semibold text-secondary">{refund.refundPercentage}%</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted">Policy</p>
+          <p className="font-medium text-secondary capitalize">{refund.cancellationPolicy}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted">Requested</p>
+          <p className="font-medium text-secondary">{fmtDate(refund.requestedAt)}</p>
+        </div>
+      </div>
+      {refund.adminNote && (
+        <div className="mt-3 rounded-lg bg-white border border-gray-100 px-3 py-2 text-xs text-muted">
+          <span className="font-medium text-secondary">Note: </span>{refund.adminNote}
+        </div>
+      )}
+      {refund.processedAt && (
+        <p className="mt-2 text-xs text-muted">Processed: {fmtDate(refund.processedAt)}</p>
+      )}
+    </div>
+  );
+};
+
 // ─── BookingCard ──────────────────────────────────────────────────────────────
-const BookingCard = ({ booking, onCancel, cancelling, onPay, paying }) => {
+const BookingCard = ({ booking, refundsMap, onCancelClick, onPay, paying }) => {
   const prop   = booking.property || {};
   const image  = (Array.isArray(prop.images) && prop.images[0]) || PLACEHOLDER;
   const city   = prop.city || prop.address?.city || '';
   const nights = diffDays(booking.checkInDate, booking.checkOutDate);
+  const refund = refundsMap[booking._id];
 
   const canCancel =
-    booking.bookingStatus === 'pending' ||
-    booking.bookingStatus === 'confirmed';
+    booking.bookingStatus === 'pending' || booking.bookingStatus === 'confirmed';
 
   const canPay =
     booking.paymentStatus === 'pending' &&
@@ -92,6 +257,11 @@ const BookingCard = ({ booking, onCancel, cancelling, onPay, paying }) => {
             className="h-full w-full object-cover"
             onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
           />
+          {booking.bookingStatus === 'cancelled' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <span className="rounded-full bg-red-500 px-3 py-1 text-xs font-bold text-white">Cancelled</span>
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -114,33 +284,34 @@ const BookingCard = ({ booking, onCancel, cancelling, onPay, paying }) => {
             {/* Dates */}
             <div className="mt-3 grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted">
-                  Check-in
-                </p>
-                <p className="mt-1 text-sm font-semibold text-secondary">
-                  {fmtDate(booking.checkInDate)}
-                </p>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted">Check-in</p>
+                <p className="mt-1 text-sm font-semibold text-secondary">{fmtDate(booking.checkInDate)}</p>
               </div>
               <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted">
-                  Check-out
-                </p>
-                <p className="mt-1 text-sm font-semibold text-secondary">
-                  {fmtDate(booking.checkOutDate)}
-                </p>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted">Check-out</p>
+                <p className="mt-1 text-sm font-semibold text-secondary">{fmtDate(booking.checkOutDate)}</p>
               </div>
             </div>
+
+            {/* Cancellation info */}
+            {booking.bookingStatus === 'cancelled' && booking.cancellationReason && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-100 bg-red-50/50 p-3">
+                <FiAlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+                <div>
+                  <p className="text-xs font-medium text-red-700">Reason: {booking.cancellationReason}</p>
+                  {booking.cancelledAt && (
+                    <p className="text-xs text-muted mt-0.5">Cancelled: {fmtDate(booking.cancelledAt)}</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer row */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs text-muted">
-                {nights} night{nights !== 1 ? 's' : ''}
-              </p>
-              <p className="mt-0.5 text-base font-bold text-secondary">
-                {formatPrice(booking.totalAmount)}
-              </p>
+              <p className="text-xs text-muted">{nights} night{nights !== 1 ? 's' : ''}</p>
+              <p className="mt-0.5 text-base font-bold text-secondary">{formatPrice(booking.totalAmount)}</p>
               <p className={`text-xs ${PAYMENT_CONFIG[booking.paymentStatus]?.cls || 'text-muted'}`}>
                 {PAYMENT_CONFIG[booking.paymentStatus]?.label}
               </p>
@@ -173,21 +344,24 @@ const BookingCard = ({ booking, onCancel, cancelling, onPay, paying }) => {
               {canCancel && (
                 <button
                   type="button"
-                  disabled={cancelling === booking._id}
-                  onClick={() => onCancel(booking._id)}
-                  className="rounded-xl border border-red-100 px-3 py-1.5 text-xs font-medium text-red-500 transition hover:bg-red-50 disabled:opacity-50"
+                  onClick={() => onCancelClick(booking)}
+                  className="rounded-xl border border-red-100 px-3 py-1.5 text-xs font-medium text-red-500 transition hover:bg-red-50"
+                  id={`cancel-booking-${booking._id}`}
                 >
-                  {cancelling === booking._id ? (
-                    <span className="h-3 w-3 animate-spin rounded-full border border-red-300 border-t-red-500 inline-block" />
-                  ) : (
-                    'Cancel'
-                  )}
+                  Cancel
                 </button>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Refund tracking section */}
+      {refund && (
+        <div className="border-t border-gray-100 px-5 py-4">
+          <RefundCard refund={refund} />
+        </div>
+      )}
     </div>
   );
 };
@@ -197,24 +371,40 @@ const MyBookings = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [bookings,   setBookings]   = useState([]);
+  const [refundsMap, setRefundsMap] = useState({});
   const [loading,    setLoading]    = useState(true);
-  const [cancelling, setCancelling] = useState(null);
   const [paying,     setPaying]     = useState(null);
   const [filter,     setFilter]     = useState('all');
 
-  const load = async () => {
+  // Cancel modal state
+  const [cancelModal, setCancelModal]       = useState(null); // booking object
+  const [cancelEstimate, setCancelEstimate] = useState(null);
+  const [loadingEstimate, setLoadingEstimate] = useState(false);
+  const [cancelling, setCancelling]         = useState(false);
+
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await fetchMyBookings();
-      setBookings(result.bookings);
+      const [bookingResult, refundResult] = await Promise.all([
+        fetchMyBookings(),
+        fetchMyRefunds().catch(() => ({ refunds: [] })),
+      ]);
+      setBookings(bookingResult.bookings);
+      // Map refunds by booking._id
+      const map = {};
+      (refundResult.refunds || []).forEach((r) => {
+        const bId = r.booking?._id || r.booking;
+        if (bId) map[bId] = r;
+      });
+      setRefundsMap(map);
     } catch (err) {
       toast.error(err.message || 'Failed to load bookings');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const handlePay = async (booking) => {
     const prop = booking.property || {};
@@ -269,19 +459,52 @@ const MyBookings = () => {
     }
   };
 
-  const handleCancel = async (id) => {
-    if (!window.confirm('Cancel this booking?')) return;
-    setCancelling(id);
+  // Open cancel modal and fetch estimate
+  const openCancelModal = async (booking) => {
+    setCancelModal(booking);
+    setCancelEstimate(null);
+    if (booking.advancePaid > 0) {
+      setLoadingEstimate(true);
+      try {
+        const estimate = await fetchRefundEstimate(booking._id);
+        setCancelEstimate(estimate);
+      } catch {
+        // skip estimate on error
+      } finally {
+        setLoadingEstimate(false);
+      }
+    }
+  };
+
+  const handleConfirmCancel = async (reason) => {
+    if (!cancelModal) return;
+    setCancelling(true);
     try {
-      await updateBookingStatus(id, 'cancelled');
+      const result = await cancelBookingWithRefund(cancelModal._id, reason);
       setBookings((prev) =>
-        prev.map((b) => b._id === id ? { ...b, bookingStatus: 'cancelled' } : b)
+        prev.map((b) =>
+          b._id === cancelModal._id
+            ? {
+                ...b,
+                bookingStatus: 'cancelled',
+                cancellationStatus: result.booking?.cancellationStatus || 'requested',
+                cancellationReason: reason,
+                cancelledAt: new Date().toISOString(),
+              }
+            : b
+        )
       );
-      toast.success('Booking cancelled');
+      if (result.refund) {
+        setRefundsMap((prev) => ({ ...prev, [cancelModal._id]: result.refund }));
+        toast.success(`Booking cancelled. Refund of ${formatPrice(result.refund.refundAmount)} requested!`);
+      } else {
+        toast.success('Booking cancelled successfully');
+      }
+      setCancelModal(null);
     } catch (err) {
-      toast.error(err.message || 'Failed to cancel');
+      toast.error(err.message || 'Failed to cancel booking');
     } finally {
-      setCancelling(null);
+      setCancelling(false);
     }
   };
 
@@ -320,6 +543,7 @@ const MyBookings = () => {
           return (
             <button
               key={tab.key}
+              id={`filter-tab-${tab.key}`}
               onClick={() => setFilter(tab.key)}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
                 filter === tab.key
@@ -337,6 +561,19 @@ const MyBookings = () => {
           );
         })}
       </div>
+
+      {/* Refund summary banner */}
+      {Object.keys(refundsMap).length > 0 && (
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-5 py-3">
+          <FiRefreshCw className="h-5 w-5 text-blue-600" />
+          <div>
+            <p className="text-sm font-semibold text-blue-800">
+              You have {Object.keys(refundsMap).length} refund{Object.keys(refundsMap).length > 1 ? 's' : ''} in progress
+            </p>
+            <p className="text-xs text-blue-600">Scroll down to see refund details on each cancelled booking</p>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       {loading ? (
@@ -369,13 +606,25 @@ const MyBookings = () => {
             <BookingCard
               key={booking._id}
               booking={booking}
-              onCancel={handleCancel}
-              cancelling={cancelling}
+              refundsMap={refundsMap}
+              onCancelClick={openCancelModal}
               onPay={handlePay}
               paying={paying}
             />
           ))}
         </div>
+      )}
+
+      {/* Cancellation modal */}
+      {cancelModal && (
+        <CancelModal
+          booking={cancelModal}
+          estimate={cancelEstimate}
+          loadingEstimate={loadingEstimate}
+          onConfirm={handleConfirmCancel}
+          onClose={() => { setCancelModal(null); setCancelEstimate(null); }}
+          cancelling={cancelling}
+        />
       )}
     </div>
   );

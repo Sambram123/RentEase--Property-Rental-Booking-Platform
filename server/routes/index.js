@@ -11,6 +11,7 @@ import adminRoutes from './adminRoutes.js';
 import messageRoutes from './messageRoutes.js';
 import testRoutes from './testRoutes.js';
 import availabilityRoutes from './availabilityRoutes.js';
+import refundRoutes from './refundRoutes.js';
 
 const registerRoutes = (app) => {
   app.get('/api/health', (req, res) => {
@@ -32,6 +33,7 @@ const registerRoutes = (app) => {
   app.use('/api/admin', adminRoutes);
   app.use('/api/messages', messageRoutes);
   app.use('/api/availability', availabilityRoutes);
+  app.use('/api/refunds', refundRoutes);
   app.use('/api/test', testRoutes);
 };
 
