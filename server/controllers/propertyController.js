@@ -259,6 +259,7 @@ const updateProperty = asyncHandler(async (req, res) => {
   const allowed = [
     'title', 'description', 'type', 'price', 'address',
     'bedrooms', 'bathrooms', 'amenities', 'images', 'availability',
+    'cancellationPolicy',
   ];
 
   allowed.forEach((field) => {

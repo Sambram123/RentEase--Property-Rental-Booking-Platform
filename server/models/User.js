@@ -97,6 +97,32 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Property',
     }],
+
+    // ── Personalization / recommendation fields ─────────────────────
+    recentlyViewed: [
+      {
+        property:  { type: mongoose.Schema.Types.ObjectId, ref: 'Property' },
+        viewedAt:  { type: Date, default: Date.now },
+      },
+    ],
+
+    preferredCities: [{ type: String, trim: true }],
+
+    preferredPropertyTypes: [
+      {
+        type: String,
+        enum: ['apartment', 'house', 'villa', 'studio', 'pg', 'commercial'],
+      },
+    ],
+
+    searchHistory: [
+      {
+        query:      { type: String, trim: true },
+        filters:    { type: mongoose.Schema.Types.Mixed, default: {} },
+        searchedAt: { type: Date, default: Date.now },
+      },
+    ],
+
     lastSeen: {
       type: Date,
       default: Date.now,

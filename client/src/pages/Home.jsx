@@ -1,28 +1,122 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FiSearch, FiMapPin, FiCalendar, FiUsers } from 'react-icons/fi';
+import { useEffect, useState, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  FiSearch, FiMapPin, FiTrendingUp, FiStar,
+  FiHome, FiArrowRight, FiClock,
+} from 'react-icons/fi';
 import PropertyCard from '../components/PropertyCard';
 import Loader from '../components/Loader';
 import { healthCheck } from '../services/api';
-import { FEATURED_PROPERTIES } from '../utils/constants';
+import { fetchTrending, fetchFeatured, fetchPopularCities } from '../services/recommendationService';
+import { trackSearch } from '../services/recommendationService';
+import { useAuth } from '../context/AuthContext';
+import { formatPrice } from '../utils/constants';
 
+const PLACEHOLDER = 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
+
+const CITY_EMOJIS = { Delhi: '🏛️', Mumbai: '🌊', Bangalore: '🌿', Chennai: '🏖️', Hyderabad: '🍖', Pune: '🌸', Kolkata: '🎨', Ahmedabad: '🛕' };
+
+// ─── Minimal PropertyMiniCard for trending/featured ───────────────────────────
+const PropertyMiniCard = ({ property }) => {
+  const img  = (Array.isArray(property.images) && property.images[0]) || PLACEHOLDER;
+  const city = property.city || property.address?.city || '';
+  return (
+    <Link
+      to={`/properties/${property._id}`}
+      className="group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-lg hover:-translate-y-0.5"
+      id={`home-prop-${property._id}`}
+    >
+      <div className="relative h-44 overflow-hidden">
+        <img
+          src={img}
+          alt={property.title}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
+        />
+        <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold capitalize text-secondary shadow-sm">
+          {property.type}
+        </span>
+        {property.rating > 0 && (
+          <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-amber-500 shadow-sm">
+            <FiStar className="h-3 w-3 fill-current" /> {property.rating.toFixed(1)}
+          </span>
+        )}
+      </div>
+      <div className="p-4">
+        <p className="line-clamp-1 font-semibold text-secondary">{property.title}</p>
+        {city && (
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+            <FiMapPin className="h-3 w-3" /> {city}
+          </p>
+        )}
+        <p className="mt-2 text-base font-bold text-primary">
+          {formatPrice(property.price)}<span className="text-xs font-normal text-muted"> /mo</span>
+        </p>
+      </div>
+    </Link>
+  );
+};
+
+// ─── Home Component ───────────────────────────────────────────────────────────
 const Home = () => {
-  const [apiStatus, setApiStatus] = useState({ loading: true, data: null, error: null });
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const [apiStatus,    setApiStatus]    = useState({ loading: true, data: null, error: null });
+  const [trending,     setTrending]     = useState([]);
+  const [featured,     setFeatured]     = useState([]);
+  const [popularCities, setPopularCities] = useState([]);
+  const [loadingProps, setLoadingProps] = useState(true);
 
+  // Search state
+  const [searchCity, setSearchCity] = useState('');
+  const [searchType, setSearchType] = useState('');
+
+  // Load API health
   useEffect(() => {
-    const fetchStatus = async () => {
+    healthCheck()
+      .then((data) => setApiStatus({ loading: false, data, error: null }))
+      .catch((err) => setApiStatus({ loading: false, data: null, error: err.message }));
+  }, []);
+
+  // Load discovery data
+  useEffect(() => {
+    const load = async () => {
       try {
-        const data = await healthCheck();
-        setApiStatus({ loading: false, data, error: null });
-      } catch (err) {
-        setApiStatus({ loading: false, data: null, error: err.message });
+        const [t, f, c] = await Promise.all([
+          fetchTrending(8).catch(() => ({ properties: [] })),
+          fetchFeatured(8).catch(() => ({ properties: [] })),
+          fetchPopularCities(8).catch(() => ({ cities: [] })),
+        ]);
+        setTrending(t.properties || []);
+        setFeatured(f.properties || []);
+        setPopularCities(c.cities || []);
+      } catch {
+        // silently skip
+      } finally {
+        setLoadingProps(false);
       }
     };
-    fetchStatus();
+    load();
   }, []);
+
+  const handleSearch = useCallback(async () => {
+    const params = new URLSearchParams();
+    if (searchCity.trim()) params.set('city', searchCity.trim());
+    if (searchType.trim()) params.set('type', searchType.trim());
+
+    // Track search for personalization
+    if (isAuthenticated) {
+      trackSearch({ city: searchCity.trim() || undefined, type: searchType.trim() || undefined });
+    }
+    navigate(`/properties?${params.toString()}`);
+  }, [searchCity, searchType, navigate, isAuthenticated]);
+
+  const showFeatured = featured.length > 0;
+  const showTrending = trending.length > 0;
 
   return (
     <>
+      {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-b from-rose-50/80 to-white px-4 pb-16 pt-12 sm:px-6 lg:px-8 lg:pb-24 lg:pt-20">
         <div className="mx-auto max-w-4xl text-center">
           <span className="inline-flex items-center rounded-full bg-white px-4 py-1.5 text-xs font-medium text-primary shadow-sm ring-1 ring-rose-100">
@@ -37,48 +131,54 @@ const Home = () => {
             with hassle-free online payments.
           </p>
 
+          {/* Search bar */}
           <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-gray-100 bg-white p-2 shadow-lg shadow-gray-200/50 sm:p-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="flex flex-1 items-center gap-2 rounded-xl bg-gray-50 px-4 py-3">
                 <FiMapPin className="h-5 w-5 shrink-0 text-muted" />
                 <input
+                  id="hero-city-input"
                   type="text"
-                  placeholder="Where do you want to live?"
+                  value={searchCity}
+                  onChange={(e) => setSearchCity(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  placeholder="City — Bangalore, Mumbai…"
                   className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
                 />
               </div>
               <div className="flex flex-1 items-center gap-2 rounded-xl bg-gray-50 px-4 py-3">
-                <FiCalendar className="h-5 w-5 shrink-0 text-muted" />
-                <input
-                  type="text"
-                  placeholder="Move-in date"
-                  className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
-                  onFocus={(e) => (e.target.type = 'date')}
-                  onBlur={(e) => !e.target.value && (e.target.type = 'text')}
-                />
-              </div>
-              <div className="flex flex-1 items-center gap-2 rounded-xl bg-gray-50 px-4 py-3">
-                <FiUsers className="h-5 w-5 shrink-0 text-muted" />
-                <select className="w-full bg-transparent text-sm text-secondary outline-none">
-                  <option>1 Guest</option>
-                  <option>2 Guests</option>
-                  <option>3+ Guests</option>
+                <FiHome className="h-5 w-5 shrink-0 text-muted" />
+                <select
+                  id="hero-type-select"
+                  value={searchType}
+                  onChange={(e) => setSearchType(e.target.value)}
+                  className="w-full bg-transparent text-sm text-secondary outline-none"
+                >
+                  <option value="">All types</option>
+                  <option value="apartment">Apartment</option>
+                  <option value="house">House</option>
+                  <option value="villa">Villa</option>
+                  <option value="studio">Studio</option>
+                  <option value="pg">PG</option>
+                  <option value="commercial">Commercial</option>
                 </select>
               </div>
-              <Link
-                to="/properties"
+              <button
+                id="hero-search-btn"
+                onClick={handleSearch}
                 className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition hover:bg-primary-dark"
               >
                 <FiSearch className="h-4 w-4" />
                 Search
-              </Link>
+              </button>
             </div>
           </div>
 
+          {/* API status pill */}
           <div className="mt-6 flex justify-center">
             {apiStatus.loading ? (
               <span className="flex items-center gap-2 text-sm text-muted">
-                <Loader size="sm" /> Checking API connection...
+                <Loader size="sm" /> Checking API…
               </span>
             ) : apiStatus.data ? (
               <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700 ring-1 ring-emerald-100">
@@ -95,54 +195,94 @@ const Home = () => {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-secondary sm:text-3xl">
-              Featured properties
-            </h2>
-            <p className="mt-1 text-muted">Handpicked rentals in top locations</p>
+      {/* ── Popular Cities ────────────────────────────────────────────────── */}
+      {popularCities.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+          <h2 className="mb-6 text-2xl font-bold text-secondary">Popular Cities</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+            {popularCities.map((c) => (
+              <Link
+                key={c.city}
+                to={`/properties?city=${encodeURIComponent(c.city)}`}
+                className="group flex flex-col items-center rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:border-primary/30 hover:shadow-md"
+                id={`city-${c.city.toLowerCase().replace(/\s/g, '-')}`}
+              >
+                <span className="text-3xl">{CITY_EMOJIS[c.city] || '🏙️'}</span>
+                <p className="mt-2 text-center text-sm font-semibold text-secondary group-hover:text-primary">{c.city}</p>
+                <p className="text-xs text-muted">{c.count} listing{c.count !== 1 ? 's' : ''}</p>
+              </Link>
+            ))}
           </div>
-          <Link
-            to="/properties"
-            className="hidden text-sm font-medium text-primary transition hover:text-primary-dark sm:block"
-          >
-            View all →
-          </Link>
-        </div>
-        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {FEATURED_PROPERTIES.map((property) => (
-            <PropertyCard key={property.id} property={property} />
-          ))}
-        </div>
-        <Link
-          to="/properties"
-          className="mt-8 block text-center text-sm font-medium text-primary sm:hidden"
-        >
-          View all properties →
-        </Link>
-      </section>
+        </section>
+      )}
 
+      {/* ── Trending Properties ───────────────────────────────────────────── */}
+      {(showTrending || loadingProps) && (
+        <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+          <div className="mb-6 flex items-end justify-between gap-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-2xl font-bold text-secondary sm:text-3xl">
+                <FiTrendingUp className="h-6 w-6 text-primary" /> Trending Properties
+              </h2>
+              <p className="mt-1 text-muted">Most viewed &amp; highly rated this week</p>
+            </div>
+            <Link to="/properties" className="hidden text-sm font-medium text-primary transition hover:text-primary-dark sm:block">
+              View all →
+            </Link>
+          </div>
+
+          {loadingProps ? (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="animate-pulse rounded-2xl border border-gray-100 bg-white shadow-sm">
+                  <div className="h-44 rounded-t-2xl bg-gray-100" />
+                  <div className="p-4 space-y-2">
+                    <div className="h-4 rounded bg-gray-100 w-3/4" />
+                    <div className="h-3 rounded bg-gray-100 w-1/2" />
+                    <div className="h-5 rounded bg-gray-100 w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {trending.map((p) => <PropertyMiniCard key={p._id} property={p} />)}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Featured Properties ───────────────────────────────────────────── */}
+      {(showFeatured || loadingProps) && (
+        <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+          <div className="mb-6 flex items-end justify-between gap-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-2xl font-bold text-secondary sm:text-3xl">
+                <FiStar className="h-6 w-6 text-amber-500" /> Featured Properties
+              </h2>
+              <p className="mt-1 text-muted">Handpicked rentals with top ratings</p>
+            </div>
+            <Link to="/properties?sort=rating" className="hidden text-sm font-medium text-primary transition hover:text-primary-dark sm:block">
+              View all →
+            </Link>
+          </div>
+          {loadingProps ? null : (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {featured.slice(0, 4).map((p) => <PropertyMiniCard key={p._id} property={p} />)}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Why RentEase ─────────────────────────────────────────────────── */}
       <section className="border-t border-gray-100 bg-gray-50/50 px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-3">
           {[
-            {
-              title: 'Verified listings',
-              desc: 'Every property is reviewed for quality and accuracy before going live.',
-            },
-            {
-              title: 'Secure payments',
-              desc: 'Pay advance rent safely with Razorpay-powered checkout.',
-            },
-            {
-              title: 'Easy booking',
-              desc: 'Book your apartment in minutes with a simple, guided flow.',
-            },
+            { title: 'Verified listings', desc: 'Every property is reviewed for quality and accuracy before going live.' },
+            { title: 'Secure payments', desc: 'Pay advance rent safely with Razorpay-powered checkout.' },
+            { title: 'Easy booking', desc: 'Book your apartment in minutes with a simple, guided flow.' },
           ].map((item) => (
-            <div
-              key={item.title}
-              className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm"
-            >
+            <div key={item.title} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <h3 className="font-semibold text-secondary">{item.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">{item.desc}</p>
             </div>

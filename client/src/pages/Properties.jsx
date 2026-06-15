@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FiSliders, FiMap, FiGrid, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiSliders, FiMap, FiGrid, FiChevronLeft, FiChevronRight, FiBookmark } from 'react-icons/fi';
 import PropertyCard from '../components/PropertyCard';
 import PropertiesMapView from '../components/PropertiesMapView';
 import SearchBar from '../components/SearchBar';
@@ -8,6 +8,9 @@ import FilterSidebar from '../components/FilterSidebar';
 import Loader from '../components/Loader';
 import { fetchProperties } from '../services/propertyService';
 import { FEATURED_PROPERTIES } from '../utils/constants';
+import { saveSearch, trackSearch } from '../services/recommendationService';
+import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const SORT_OPTIONS = [
   { value: 'newest',     label: 'Newest first' },
@@ -21,6 +24,7 @@ const parseList = (value) => (value ? value.split(',').map((x) => x.trim()).filt
 
 const Properties = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isAuthenticated } = useAuth();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
@@ -28,6 +32,7 @@ const Properties = () => {
   const [draftFilters, setDraftFilters] = useState({ type: '', minPrice: '', maxPrice: '', bedrooms: '', bathrooms: '', availability: 'true', amenities: [] });
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode]       = useState('grid'); // 'grid' | 'map'
+  const [savingSearch, setSavingSearch] = useState(false);
 
   const query = useMemo(() => ({
     q: searchParams.get('q') || '',
@@ -116,6 +121,34 @@ const Properties = () => {
   const applyFilters = () => {
     updateParams(draftFilters, true);
     setShowFilters(false);
+    // Track filters as search
+    if (isAuthenticated) {
+      trackSearch({
+        city: draftFilters.city || query.city || undefined,
+        type: draftFilters.type || undefined,
+        q:    query.q || undefined,
+      }).catch(() => {});
+    }
+  };
+
+  const handleSaveSearch = async () => {
+    if (!isAuthenticated) { toast.error('Sign in to save searches'); return; }
+    setSavingSearch(true);
+    try {
+      const name = [query.city, query.type, query.q].filter(Boolean).join(' · ') || 'My Search';
+      await saveSearch(name, {
+        q: query.q || '',
+        city: query.city || '',
+        type: query.type || '',
+        minPrice: query.minPrice ? Number(query.minPrice) : null,
+        maxPrice: query.maxPrice ? Number(query.maxPrice) : null,
+      });
+      toast.success('Search saved! Find it in your dashboard.');
+    } catch (err) {
+      toast.error(err.message || 'Failed to save search');
+    } finally {
+      setSavingSearch(false);
+    }
   };
 
   const resetFilters = () => {
@@ -195,6 +228,7 @@ const Properties = () => {
                 ? 'border-primary bg-primary/5 text-primary'
                 : 'border-gray-200 bg-white text-secondary hover:bg-gray-50'
             }`}
+            id="toggle-filters-btn"
           >
             <FiSliders className="h-4 w-4" />
             Filters
@@ -204,6 +238,19 @@ const Properties = () => {
               </span>
             )}
           </button>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleSaveSearch}
+              disabled={savingSearch}
+              id="save-search-btn"
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-secondary transition hover:bg-gray-50 disabled:opacity-50"
+            >
+              <FiBookmark className="h-4 w-4" />
+              {savingSearch ? 'Saving…' : 'Save search'}
+            </button>
+          )}
         </div>
       </div>
 

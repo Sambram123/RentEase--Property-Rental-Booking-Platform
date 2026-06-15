@@ -26,6 +26,9 @@ const addToWishlist = asyncHandler(async (req, res) => {
   user.wishlist.push(propertyId);
   await user.save();
 
+  // Increment wishlistCount for recommendation scoring
+  await Property.findByIdAndUpdate(propertyId, { $inc: { wishlistCount: 1 } });
+
   res.status(200).json({
     success: true,
     message: 'Added to wishlist',
@@ -51,6 +54,9 @@ const removeFromWishlist = asyncHandler(async (req, res) => {
 
   user.wishlist.splice(idx, 1);
   await user.save();
+
+  // Decrement wishlistCount (floor at 0)
+  await Property.findByIdAndUpdate(propertyId, { $inc: { wishlistCount: -1 } });
 
   res.status(200).json({
     success: true,

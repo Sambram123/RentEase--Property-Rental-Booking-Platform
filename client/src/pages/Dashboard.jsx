@@ -4,6 +4,7 @@ import {
   FiCalendar, FiHome, FiHeart, FiCreditCard,
   FiBell, FiCheckCircle, FiXCircle, FiClock, FiSearch,
   FiArrowRight, FiTrendingUp, FiUser, FiSettings, FiMessageSquare,
+  FiBookmark, FiTrash2,
 } from 'react-icons/fi';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -17,6 +18,8 @@ import { formatPrice } from '../utils/constants';
 import ActivityFeed from '../components/ActivityFeed';
 import { useChat } from '../context/ChatContext';
 import { getUserAvatar } from '../utils/avatar';
+import RecentlyViewed from '../components/RecentlyViewed';
+import { fetchRecommendations, fetchSavedSearches, deleteSavedSearch } from '../services/recommendationService';
 
 // ─── Skeleton loader ──────────────────────────────────────────────────────────
 const SkeletonCard = () => (
@@ -102,6 +105,8 @@ const Dashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
+  const [savedSearches, setSavedSearches] = useState([]);
 
   // Redirect owner/admin to /owner/dashboard
   useEffect(() => {
@@ -127,6 +132,17 @@ const Dashboard = () => {
       }
     };
     load();
+  }, [authLoading, token, isOwnerOrAdmin]);
+
+  // Load personalization data
+  useEffect(() => {
+    if (authLoading || !token || isOwnerOrAdmin) return;
+    fetchRecommendations()
+      .then((d) => setRecommendations(d.personalized || []))
+      .catch(() => {});
+    fetchSavedSearches()
+      .then((d) => setSavedSearches(d.searches || []))
+      .catch(() => {});
   }, [authLoading, token, isOwnerOrAdmin]);
 
   if (isOwnerOrAdmin) return null;
@@ -478,6 +494,90 @@ const Dashboard = () => {
       <section className="mt-8">
         <ActivityFeed maxItems={5} />
       </section>
+
+      {/* ── Recently Viewed ────────────────────────────────────────── */}
+      <section className="mt-8">
+        <RecentlyViewed maxItems={6} />
+      </section>
+
+      {/* ── Recommended For You ────────────────────────────────────── */}
+      {recommendations.length > 0 && (
+        <section className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-secondary">✨ Recommended For You</h2>
+            <Link to="/properties" className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark">
+              View all <FiArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {recommendations.slice(0, 6).map((p) => {
+              const img  = (Array.isArray(p.images) && p.images[0]) || PLACEHOLDER;
+              const city = p.city || p.address?.city || '';
+              return (
+                <Link
+                  key={p._id}
+                  to={`/properties/${p._id}`}
+                  className="group overflow-hidden rounded-xl border border-gray-100 transition hover:shadow-md"
+                  id={`rec-prop-${p._id}`}
+                >
+                  <div className="relative h-28 overflow-hidden">
+                    <img src={img} alt={p.title} className="h-full w-full object-cover transition group-hover:scale-105"
+                      onError={(e) => { e.currentTarget.src = PLACEHOLDER; }} />
+                    <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] capitalize font-semibold text-secondary shadow-sm">{p.type}</span>
+                  </div>
+                  <div className="p-3">
+                    <p className="line-clamp-1 text-sm font-semibold text-secondary">{p.title}</p>
+                    <p className="text-xs text-muted">{city}</p>
+                    <p className="mt-1 text-sm font-bold text-primary">{formatPrice(p.price)}<span className="text-xs font-normal text-muted">/mo</span></p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* ── Saved Searches ─────────────────────────────────────────── */}
+      {savedSearches.length > 0 && (
+        <section className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-secondary">
+              <FiBookmark className="h-5 w-5 text-primary" /> Saved Searches
+            </h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {savedSearches.slice(0, 6).map((s) => {
+              const params = new URLSearchParams();
+              if (s.filters?.city) params.set('city', s.filters.city);
+              if (s.filters?.type) params.set('type', s.filters.type);
+              if (s.filters?.q)    params.set('q', s.filters.q);
+              return (
+                <div key={s._id} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/40 p-3">
+                  <Link
+                    to={`/properties?${params.toString()}`}
+                    className="min-w-0 flex-1"
+                  >
+                    <p className="truncate text-sm font-semibold text-secondary">{s.name}</p>
+                    <p className="truncate text-xs text-muted">
+                      {[s.filters?.city, s.filters?.type, s.filters?.q].filter(Boolean).join(' · ') || 'All properties'}
+                    </p>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await deleteSavedSearch(s._id).catch(() => {});
+                      setSavedSearches((prev) => prev.filter((x) => x._id !== s._id));
+                    }}
+                    className="shrink-0 rounded p-1 text-muted transition hover:text-red-500"
+                  >
+                    <FiTrash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 };

@@ -21,6 +21,7 @@ import { openRazorpayCheckout } from '../utils/razorpayCheckout';
 import { formatPrice, FEATURED_PROPERTIES } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 import { createConversation } from '../services/messageService';
+import { trackPropertyView, fetchSimilarProperties } from '../services/recommendationService';
 
 const AMENITY_ICONS = {
   wifi:         { icon: '📶', label: 'WiFi' },
@@ -633,6 +634,7 @@ const PropertyDetails = () => {
   const [wishlisted, setWishlisted] = useState(false);
   const [wishLoading, setWishLoading] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
+  const [similarProperties, setSimilarProperties] = useState([]);
 
   useEffect(() => {
     const load = async () => {
@@ -641,6 +643,16 @@ const PropertyDetails = () => {
       try {
         const data = await fetchPropertyById(id);
         setProperty(data);
+        // Track view (fire-and-forget)
+        if (isAuthenticated && data._id && !/^[0-9]+$/.test(data._id)) {
+          trackPropertyView(data._id);
+        }
+        // Fetch similar
+        if (data._id && !/^[0-9]+$/.test(data._id)) {
+          fetchSimilarProperties(data._id, 4)
+            .then((d) => setSimilarProperties(d.properties || []))
+            .catch(() => {});
+        }
       } catch {
         const mock = FEATURED_PROPERTIES.find((p) => p.id === id);
         if (mock) {
@@ -663,7 +675,7 @@ const PropertyDetails = () => {
       }
     };
     load();
-  }, [id]);
+  }, [id, isAuthenticated]);
 
   // Check if property is in wishlist
   useEffect(() => {
@@ -942,6 +954,56 @@ const PropertyDetails = () => {
             isAuthenticated={isAuthenticated}
             currentUserId={user?._id}
           />
+
+          {/* Similar Properties */}
+          {similarProperties.length > 0 && (
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 font-semibold text-secondary">
+                <FiHome className="h-4 w-4 text-primary" /> Similar Properties
+              </h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {similarProperties.map((sp) => {
+                  const spImg = (Array.isArray(sp.images) && sp.images[0]) ||
+                    'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
+                  const spCity = sp.city || sp.address?.city || '';
+                  return (
+                    <Link
+                      key={sp._id}
+                      to={`/properties/${sp._id}`}
+                      className="group overflow-hidden rounded-xl border border-gray-100 transition hover:shadow-md"
+                      id={`similar-property-${sp._id}`}
+                    >
+                      <div className="relative h-32 overflow-hidden">
+                        <img
+                          src={spImg}
+                          alt={sp.title}
+                          className="h-full w-full object-cover transition group-hover:scale-105"
+                          onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }}
+                        />
+                        <span className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold capitalize text-secondary shadow">
+                          {sp.type}
+                        </span>
+                      </div>
+                      <div className="p-3">
+                        <p className="line-clamp-1 text-sm font-semibold text-secondary">{sp.title}</p>
+                        <div className="mt-1 flex items-center gap-1 text-xs text-muted">
+                          {spCity && <><FiMapPin className="h-3 w-3" />{spCity}</>}
+                          {sp.rating > 0 && (
+                            <span className="ml-auto flex items-center gap-0.5 text-amber-500">
+                              <FiStar className="h-3 w-3 fill-current" />{sp.rating.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm font-bold text-primary">
+                          {formatPrice(sp.price)}<span className="text-xs font-normal text-muted">/mo</span>
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Right column — Booking panel ────────────────────────────── */}
