@@ -19,6 +19,11 @@ import {
   updateRefundStatus,
   getRefundAnalytics,
 } from '../controllers/refundController.js';
+import {
+  getSecurityDashboard,
+  getAuditLogs,
+  getFailedLogins,
+} from '../controllers/securityController.js';
 
 const router = Router();
 
@@ -53,5 +58,10 @@ router.delete('/reviews/:id', deleteReview);
 router.get('/refunds/analytics', getRefundAnalytics);
 router.get('/refunds', getOwnerRefunds);
 router.put('/refunds/:id/status', updateRefundStatus);
+
+// ── Security Monitoring (admin only) ─────────────────────────────────────────
+router.get('/security/dashboard', getSecurityDashboard);
+router.get('/security/logs', getAuditLogs);
+router.get('/security/failed-logins', getFailedLogins);
 
 export default router;

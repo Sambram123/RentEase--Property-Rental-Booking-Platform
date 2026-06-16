@@ -2,6 +2,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import User from '../models/User.js';
 import generateToken from '../utils/generateToken.js';
 import { applyDiceBearAvatar } from '../utils/dicebear.js';
+import { audit, auditAuthFailure } from '../services/auditService.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // @desc    Register a new user
@@ -22,6 +23,10 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error('Password must be at least 6 characters');
   }
 
+  // Prevent role escalation — disallow 'admin' role via registration
+  const allowedRoles = ['tenant', 'owner'];
+  const assignedRole = allowedRoles.includes(role) ? role : 'tenant';
+
   // ── Check for duplicate email ─────────────────────────────────────────────
   const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
   if (existingUser) {
@@ -34,10 +39,18 @@ const registerUser = asyncHandler(async (req, res) => {
     name: name.trim(),
     email: email.toLowerCase().trim(),
     password,
-    role: role || 'tenant',
+    role: assignedRole,
   });
   applyDiceBearAvatar(user, { seed: user.email });
   await user.save();
+
+  // ── Audit log ─────────────────────────────────────────────────────────────
+  await audit(req, {
+    actorId: user._id,
+    action: 'register',
+    resource: { type: 'User', id: user._id },
+    metadata: { email: user.email, role: user.role },
+  });
 
   // ── Generate JWT ──────────────────────────────────────────────────────────
   const token = generateToken({ id: user._id, role: user.role });
@@ -76,9 +89,23 @@ const loginUser = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
 
   if (!user || !(await user.matchPassword(password))) {
+    // Audit failed login
+    await auditAuthFailure(req, {
+      action: 'login_failed',
+      metadata: { email: email.toLowerCase().trim() },
+      errorMessage: 'Invalid email or password',
+    });
     res.status(401);
     throw new Error('Invalid email or password');
   }
+
+  // ── Audit successful login ────────────────────────────────────────────────
+  await audit(req, {
+    actorId: user._id,
+    action: 'login_success',
+    resource: { type: 'User', id: user._id },
+    metadata: { email: user.email },
+  });
 
   // ── Generate JWT ──────────────────────────────────────────────────────────
   const token = generateToken({ id: user._id, role: user.role });
@@ -163,6 +190,14 @@ const firebaseAuth = asyncHandler(async (req, res) => {
     applyDiceBearAvatar(user, { seed: user.email });
     await user.save();
   }
+
+  // ── Audit log ─────────────────────────────────────────────────────────────
+  await audit(req, {
+    actorId: user._id,
+    action: 'firebase_auth',
+    resource: { type: 'User', id: user._id },
+    metadata: { email: user.email },
+  });
 
   const token = generateToken({ id: user._id, role: user.role });
 

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { protect } from '../middleware/authMiddleware.js';
+import { messageLimiter } from '../middleware/rateLimiter.js';
 import {
   createConversation,
   getConversations,
@@ -18,10 +19,10 @@ const router = Router();
 // All routes require authentication
 router.use(protect);
 
-router.post('/conversation', createConversation);
+router.post('/conversation', messageLimiter, createConversation);
 router.get('/conversations', getConversations);
 router.get('/conversation/:id', getConversationMessages);
-router.post('/send', sendMessage);
+router.post('/send', messageLimiter, sendMessage);
 router.put('/read/:conversationId', markMessagesRead);
 router.get('/unread-count', getUnreadCount);
 router.delete('/:messageId', deleteMessage);

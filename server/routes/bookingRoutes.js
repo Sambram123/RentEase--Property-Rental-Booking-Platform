@@ -13,6 +13,7 @@ import {
   getRefundEstimate,
 } from '../controllers/refundController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { strictLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -29,8 +30,8 @@ router.get('/owner/all', protect, getOwnerAllBookings);
 router.get('/property/:propertyId', protect, getPropertyBookings);
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
-// POST /api/bookings   — create booking
-router.post('/', protect, createBooking);
+// POST /api/bookings   — create booking (rate limited)
+router.post('/', protect, strictLimiter, createBooking);
 
 // GET /api/bookings/:id — single booking detail
 router.get('/:id', protect, getBookingById);
@@ -38,8 +39,8 @@ router.get('/:id', protect, getBookingById);
 // PUT /api/bookings/:id/status — update booking status
 router.put('/:id/status', protect, updateBookingStatus);
 
-// POST /api/bookings/:id/cancel — cancel booking + create refund
-router.post('/:id/cancel', protect, cancelBooking);
+// POST /api/bookings/:id/cancel — cancel booking + create refund (rate limited)
+router.post('/:id/cancel', protect, strictLimiter, cancelBooking);
 
 // GET /api/bookings/:id/refund-estimate — refund preview before cancellation
 router.get('/:id/refund-estimate', protect, getRefundEstimate);
