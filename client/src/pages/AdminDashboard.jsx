@@ -3,7 +3,7 @@ import {
   FiUsers, FiHome, FiCalendar, FiDollarSign, FiStar,
   FiBarChart2, FiSearch, FiTrash2, FiEdit, FiCheck,
   FiX, FiChevronLeft, FiChevronRight, FiShield, FiActivity,
-  FiRefreshCw,
+  FiRefreshCw, FiLock, FiAlertTriangle, FiEye,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import {
@@ -19,6 +19,7 @@ import {
   fetchAdminReviews, deleteAdminReview,
 } from '../services/adminService';
 import { fetchAdminRefunds, updateRefundStatus } from '../services/refundService';
+import { fetchSecurityDashboard, fetchAuditLogs } from '../services/securityService';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -37,6 +38,7 @@ const TAB_ITEMS = [
   { key: 'payments', label: 'Payments', icon: FiDollarSign },
   { key: 'reviews', label: 'Reviews', icon: FiStar },
   { key: 'refunds', label: 'Refunds', icon: FiRefreshCw },
+  { key: 'security', label: 'Security', icon: FiShield },
 ];
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -116,6 +118,12 @@ const AdminDashboard = () => {
   const [refunds, setRefunds] = useState({ refunds: [], total: 0, page: 1, pages: 1, summary: {} });
   const [refundStatusFilter, setRefundStatusFilter] = useState('');
 
+  // Security state
+  const [securityData, setSecurityData] = useState(null);
+  const [auditLogs, setAuditLogs] = useState({ logs: [], total: 0, page: 1, pages: 1 });
+  const [auditActionFilter, setAuditActionFilter] = useState('');
+  const [securityLoading, setSecurityLoading] = useState(false);
+
   // ── Load dashboard ────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
@@ -173,6 +181,22 @@ const AdminDashboard = () => {
     } catch (err) { toast.error(err.message); }
   }, [refundStatusFilter]);
 
+  const loadSecurity = useCallback(async () => {
+    setSecurityLoading(true);
+    try {
+      const data = await fetchSecurityDashboard();
+      setSecurityData(data);
+    } catch (err) { toast.error(err.message || 'Failed to load security data'); }
+    finally { setSecurityLoading(false); }
+  }, []);
+
+  const loadAuditLogs = useCallback(async (page = 1) => {
+    try {
+      const data = await fetchAuditLogs({ page, action: auditActionFilter || undefined });
+      setAuditLogs(data);
+    } catch (err) { toast.error(err.message); }
+  }, [auditActionFilter]);
+
   // ── Load on tab switch ─────────────────────────────────────────────────────
   useEffect(() => {
     if (tab === 'users') loadUsers();
@@ -181,7 +205,8 @@ const AdminDashboard = () => {
     else if (tab === 'payments') loadPayments();
     else if (tab === 'reviews') loadReviews();
     else if (tab === 'refunds') loadRefunds();
-  }, [tab, loadUsers, loadProperties, loadBookings, loadPayments, loadReviews, loadRefunds]);
+    else if (tab === 'security') { loadSecurity(); loadAuditLogs(); }
+  }, [tab, loadUsers, loadProperties, loadBookings, loadPayments, loadReviews, loadRefunds, loadSecurity, loadAuditLogs]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const handleRoleChange = async (id, role) => {
@@ -867,6 +892,186 @@ const AdminDashboard = () => {
                 </table>
               </div>
               <Pagination page={refunds.page} pages={refunds.pages} onPageChange={(p) => loadRefunds(p)} />
+            </div>
+          )}
+
+          {/* ═══════ SECURITY ═══════ */}
+          {tab === 'security' && (
+            <div className="space-y-6">
+              {securityLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                </div>
+              ) : (
+                <>
+                  {/* Summary stat cards */}
+                  {securityData && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                        <StatCard icon={FiAlertTriangle} label="Failed Logins (24h)" value={securityData.summary?.failedLoginsLast24h ?? '—'} color="#e17055" />
+                        <StatCard icon={FiCheck} label="Successful Logins (24h)" value={securityData.summary?.totalLoginsLast24h ?? '—'} color="#00b894" />
+                        <StatCard icon={FiUsers} label="New Registrations (24h)" value={securityData.summary?.registrationsLast24h ?? '—'} color="#6c5ce7" />
+                        <StatCard icon={FiLock} label="Unauthorized Attempts" value={securityData.summary?.unauthorizedAccessLast24h ?? '—'} color="#ff385c" />
+                        <StatCard icon={FiActivity} label="Failure Rate" value={`${securityData.summary?.loginFailureRate ?? 0}%`} color="#fdcb6e" />
+                      </div>
+
+                      {/* Suspicious IPs */}
+                      <div className="grid gap-6 md:grid-cols-2">
+                        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                          <div className="mb-3 flex items-center gap-2">
+                            <FiAlertTriangle className="h-4 w-4 text-amber-500" />
+                            <h3 className="text-sm font-semibold text-secondary">Top Suspicious IPs (7 days)</h3>
+                          </div>
+                          <div className="space-y-2">
+                            {(securityData.topSuspiciousIPs || []).length === 0 && (
+                              <p className="py-4 text-center text-xs text-muted">No suspicious activity detected</p>
+                            )}
+                            {(securityData.topSuspiciousIPs || []).map((ip, i) => (
+                              <div key={i} className="flex items-center justify-between rounded-xl border border-gray-50 bg-gray-50/60 px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+                                    ip.count >= 10 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
+                                  }`}>{i + 1}</span>
+                                  <span className="font-mono text-sm text-secondary">{ip._id}</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="block text-sm font-semibold text-red-500">{ip.count} attempts</span>
+                                  <span className="text-[10px] text-muted">{ip.lastAttempt ? new Date(ip.lastAttempt).toLocaleDateString('en-IN') : ''}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Recent failed logins */}
+                        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                          <div className="mb-3 flex items-center gap-2">
+                            <FiLock className="h-4 w-4 text-red-500" />
+                            <h3 className="text-sm font-semibold text-secondary">Recent Failed Logins</h3>
+                          </div>
+                          <div className="space-y-2">
+                            {(securityData.recentFailedLogins || []).length === 0 && (
+                              <p className="py-4 text-center text-xs text-muted">No recent failures</p>
+                            )}
+                            {(securityData.recentFailedLogins || []).map((log) => (
+                              <div key={log._id} className="flex items-center justify-between rounded-xl border border-gray-50 bg-red-50/40 px-3 py-2">
+                                <div>
+                                  <p className="text-xs font-medium text-secondary">{log.metadata?.email || 'Unknown'}</p>
+                                  <p className="font-mono text-[10px] text-muted">{log.ipAddress || 'N/A'}</p>
+                                </div>
+                                <span className="text-[10px] text-muted">{new Date(log.createdAt).toLocaleString('en-IN', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action breakdown */}
+                      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                        <div className="mb-3 flex items-center gap-2">
+                          <FiActivity className="h-4 w-4 text-primary" />
+                          <h3 className="text-sm font-semibold text-secondary">Action Breakdown (7 days)</h3>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(securityData.actionBreakdown7d || []).map((item) => (
+                            <span key={item._id} className="rounded-full border border-gray-100 bg-gray-50 px-3 py-1 text-xs font-medium text-secondary">
+                              <span className="text-muted">{item._id}</span>: <span className="font-bold text-primary">{item.count}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Audit Logs */}
+                  <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-2">
+                        <FiEye className="h-4 w-4 text-primary" />
+                        <h3 className="text-sm font-semibold text-secondary">Audit Logs</h3>
+                      </div>
+                      <div className="flex gap-2">
+                        <select
+                          value={auditActionFilter}
+                          onChange={(e) => setAuditActionFilter(e.target.value)}
+                          className="rounded-xl border border-gray-200 px-3 py-2 text-xs text-secondary outline-none focus:border-primary"
+                          id="audit-action-filter"
+                        >
+                          <option value="">All Actions</option>
+                          <option value="login_success">Login Success</option>
+                          <option value="login_failed">Login Failed</option>
+                          <option value="register">Register</option>
+                          <option value="payment_verified">Payment Verified</option>
+                          <option value="payment_failed">Payment Failed</option>
+                          <option value="booking_create">Booking Create</option>
+                          <option value="booking_cancel">Booking Cancel</option>
+                          <option value="refund_request">Refund Request</option>
+                          <option value="admin_user_delete">Admin User Delete</option>
+                          <option value="unauthorized_access">Unauthorized Access</option>
+                        </select>
+                        <button
+                          onClick={() => loadAuditLogs()}
+                          className="rounded-xl bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-dark"
+                          id="audit-filter-btn"
+                        >
+                          Filter
+                        </button>
+                        <button
+                          onClick={() => { setAuditActionFilter(''); loadAuditLogs(1); }}
+                          className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-muted hover:bg-gray-50"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-gray-100 bg-gray-50/60">
+                            <th className="px-4 py-3 font-semibold text-muted">Action</th>
+                            <th className="px-4 py-3 font-semibold text-muted">Actor</th>
+                            <th className="px-4 py-3 font-semibold text-muted">IP Address</th>
+                            <th className="px-4 py-3 font-semibold text-muted">Status</th>
+                            <th className="px-4 py-3 font-semibold text-muted">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {auditLogs.logs?.map((log) => (
+                            <tr key={log._id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                              <td className="px-4 py-2.5">
+                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                  log.action.includes('failed') || log.action.includes('invalid')
+                                    ? 'bg-red-100 text-red-600'
+                                    : log.action.includes('success') || log.action.includes('verified')
+                                    ? 'bg-emerald-100 text-emerald-600'
+                                    : log.action.includes('delete') || log.action.includes('cancel')
+                                    ? 'bg-amber-100 text-amber-600'
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {log.action}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-muted">{log.actor?.email || log.actor?.name || 'Anonymous'}</td>
+                              <td className="px-4 py-2.5 font-mono text-muted">{log.ipAddress || '—'}</td>
+                              <td className="px-4 py-2.5">
+                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                  log.success ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                                }`}>{log.success ? 'Success' : 'Failed'}</span>
+                              </td>
+                              <td className="px-4 py-2.5 text-muted">{new Date(log.createdAt).toLocaleString('en-IN', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                            </tr>
+                          ))}
+                          {(!auditLogs.logs || auditLogs.logs.length === 0) && (
+                            <tr><td colSpan={5} className="px-4 py-10 text-center text-muted">No audit logs found</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Pagination page={auditLogs.page} pages={auditLogs.pages} onPageChange={(p) => loadAuditLogs(p)} />
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
