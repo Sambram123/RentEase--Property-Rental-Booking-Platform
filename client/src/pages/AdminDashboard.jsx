@@ -20,6 +20,8 @@ import {
 } from '../services/adminService';
 import { fetchAdminRefunds, updateRefundStatus } from '../services/refundService';
 import { fetchSecurityDashboard, fetchAuditLogs } from '../services/securityService';
+import PerformanceDashboard from '../components/PerformanceDashboard';
+import { useAuth } from '../context/AuthContext';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -31,14 +33,15 @@ const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-dig
 const COLORS = ['#ff385c','#00b894','#6c5ce7','#fdcb6e','#0984e3','#e17055'];
 
 const TAB_ITEMS = [
-  { key: 'overview', label: 'Overview', icon: FiBarChart2 },
-  { key: 'users', label: 'Users', icon: FiUsers },
-  { key: 'properties', label: 'Properties', icon: FiHome },
-  { key: 'bookings', label: 'Bookings', icon: FiCalendar },
-  { key: 'payments', label: 'Payments', icon: FiDollarSign },
-  { key: 'reviews', label: 'Reviews', icon: FiStar },
-  { key: 'refunds', label: 'Refunds', icon: FiRefreshCw },
-  { key: 'security', label: 'Security', icon: FiShield },
+  { key: 'overview',     label: 'Overview',     icon: FiBarChart2 },
+  { key: 'users',        label: 'Users',        icon: FiUsers },
+  { key: 'properties',   label: 'Properties',   icon: FiHome },
+  { key: 'bookings',     label: 'Bookings',     icon: FiCalendar },
+  { key: 'payments',     label: 'Payments',     icon: FiDollarSign },
+  { key: 'reviews',      label: 'Reviews',      icon: FiStar },
+  { key: 'refunds',      label: 'Refunds',      icon: FiRefreshCw },
+  { key: 'security',     label: 'Security',     icon: FiShield },
+  { key: 'performance',  label: 'Performance',  icon: FiActivity },
 ];
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -94,9 +97,11 @@ const ChartCard = ({ title, children }) => (
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
 const AdminDashboard = () => {
+  const { token } = useAuth();
   const [tab, setTab] = useState('overview');
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
+
 
   // Section states
   const [users, setUsers] = useState({ users: [], total: 0, page: 1, pages: 1 });
@@ -1074,6 +1079,11 @@ const AdminDashboard = () => {
               )}
             </div>
           )}
+
+          {/* ═══════ PERFORMANCE ═══════ */}
+          {tab === 'performance' && (
+            <PerformanceDashboard token={token} />
+          )}
         </div>
       </div>
     </div>
@@ -1081,3 +1091,4 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+
