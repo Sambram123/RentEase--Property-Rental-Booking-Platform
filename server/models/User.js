@@ -133,8 +133,11 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// ─── Indexes ────────────────────────────────────────────────────────────────
+// ─── Indexes ─────────────────────────────────────────────────────────────────
 userSchema.index({ role: 1 });
+userSchema.index({ role: 1, createdAt: -1 });                // admin user listing
+userSchema.index({ lastSeen: -1 });                          // activity tracking
+
 
 // ─── Pre-save hook: hash password before storing ─────────────────────────────
 userSchema.pre('save', async function (next) {

@@ -93,11 +93,18 @@ bookingSchema.pre('save', function (next) {
   next();
 });
 
-// ─── Indexes ──────────────────────────────────────────────────────────────────
+// ─── Indexes ─────────────────────────────────────────────────────────────────
+// Single field
 bookingSchema.index({ user: 1 });
 bookingSchema.index({ property: 1 });
 bookingSchema.index({ bookingStatus: 1 });
 bookingSchema.index({ checkInDate: 1, checkOutDate: 1 });
+// Compound indexes
+bookingSchema.index({ user: 1, bookingStatus: 1, createdAt: -1 });    // tenant dashboard
+bookingSchema.index({ property: 1, bookingStatus: 1, createdAt: -1 }); // owner dashboard
+bookingSchema.index({ user: 1, createdAt: -1 });                       // pagination
+bookingSchema.index({ property: 1, checkInDate: 1, checkOutDate: 1 }); // availability check
+bookingSchema.index({ bookingStatus: 1, createdAt: -1 });              // admin dashboard
 
 const Booking = mongoose.model('Booking', bookingSchema);
 

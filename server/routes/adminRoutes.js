@@ -24,6 +24,8 @@ import {
   getAuditLogs,
   getFailedLogins,
 } from '../controllers/securityController.js';
+import { getPerformanceDashboard } from '../controllers/performanceController.js';
+
 
 const router = Router();
 
@@ -64,4 +66,8 @@ router.get('/security/dashboard', getSecurityDashboard);
 router.get('/security/logs', getAuditLogs);
 router.get('/security/failed-logins', getFailedLogins);
 
+// ── Performance Monitoring (admin only) ──────────────────────────────────────
+router.get('/performance', getPerformanceDashboard);
+
 export default router;
+

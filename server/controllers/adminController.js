@@ -5,6 +5,8 @@ import Booking from '../models/Booking.js';
 import Payment from '../models/Payment.js';
 import Review from '../models/Review.js';
 import Notification from '../models/Notification.js';
+import { getOrSet, TTL } from '../services/cacheService.js';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // @desc    Admin dashboard overview
@@ -12,126 +14,87 @@ import Notification from '../models/Notification.js';
 // @access  Admin
 // ─────────────────────────────────────────────────────────────────────────────
 const getAdminDashboard = asyncHandler(async (req, res) => {
-  const [
-    totalUsers,
-    totalOwners,
-    totalTenants,
-    totalProperties,
-    totalBookings,
-    totalPayments,
-    revenueAgg,
-    recentUsers,
-    recentBookings,
-    recentPayments,
-  ] = await Promise.all([
-    User.countDocuments(),
-    User.countDocuments({ role: 'owner' }),
-    User.countDocuments({ role: 'tenant' }),
-    Property.countDocuments(),
-    Booking.countDocuments(),
-    Payment.countDocuments(),
-    Payment.aggregate([
-      { $match: { paymentStatus: 'success' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]),
-    User.find().sort({ createdAt: -1 }).limit(5).select('-password').lean(),
-    Booking.find()
-      .populate('user', 'name email')
-      .populate('property', 'title city')
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean(),
-    Payment.find()
-      .populate('user', 'name email')
-      .populate('property', 'title')
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean(),
-  ]);
+  const data = await getOrSet('admin:dashboard', async () => {
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  const totalRevenue = revenueAgg[0]?.total || 0;
-
-  // Active counts
-  const [activeBookings, activeProperties, failedPayments, successPayments] =
-    await Promise.all([
+    // All counts + recent items + analytics in ONE parallel batch
+    const [
+      totalUsers, totalOwners, totalTenants,
+      totalProperties, totalBookings, totalPayments,
+      activeBookings, activeProperties, failedPayments, successPayments,
+      revenueAgg,
+      recentUsers, recentBookings, recentPayments,
+      userGrowth, revenueTrend, bookingTrend, propertyGrowth,
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ role: 'owner' }),
+      User.countDocuments({ role: 'tenant' }),
+      Property.countDocuments(),
+      Booking.countDocuments(),
+      Payment.countDocuments(),
       Booking.countDocuments({ bookingStatus: 'confirmed' }),
       Property.countDocuments({ availability: true }),
       Payment.countDocuments({ paymentStatus: 'failed' }),
       Payment.countDocuments({ paymentStatus: 'success' }),
-    ]);
-
-  // ── Analytics: last 6 months ──
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-  const [userGrowth, revenueTrend, bookingTrend, propertyGrowth] =
-    await Promise.all([
+      Payment.aggregate([
+        { $match: { paymentStatus: 'success' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      User.find().sort({ createdAt: -1 }).limit(5).select('name email role createdAt isVerified').lean(),
+      Booking.find()
+        .select('user property bookingStatus totalAmount createdAt')
+        .populate('user', 'name email')
+        .populate('property', 'title city')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+      Payment.find()
+        .select('user property amount paymentStatus createdAt')
+        .populate('user', 'name email')
+        .populate('property', 'title')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+      // Analytics
       User.aggregate([
         { $match: { createdAt: { $gte: sixMonthsAgo } } },
-        {
-          $group: {
-            _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
-            count: { $sum: 1 },
-          },
-        },
+        { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 } } },
         { $sort: { '_id.year': 1, '_id.month': 1 } },
       ]),
       Payment.aggregate([
         { $match: { paymentStatus: 'success', createdAt: { $gte: sixMonthsAgo } } },
-        {
-          $group: {
-            _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
-            revenue: { $sum: '$amount' },
-            count: { $sum: 1 },
-          },
-        },
+        { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, revenue: { $sum: '$amount' }, count: { $sum: 1 } } },
         { $sort: { '_id.year': 1, '_id.month': 1 } },
       ]),
       Booking.aggregate([
         { $match: { createdAt: { $gte: sixMonthsAgo } } },
-        {
-          $group: {
-            _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
-            count: { $sum: 1 },
-          },
-        },
+        { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 } } },
         { $sort: { '_id.year': 1, '_id.month': 1 } },
       ]),
       Property.aggregate([
         { $match: { createdAt: { $gte: sixMonthsAgo } } },
-        {
-          $group: {
-            _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
-            count: { $sum: 1 },
-          },
-        },
+        { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 } } },
         { $sort: { '_id.year': 1, '_id.month': 1 } },
       ]),
     ]);
 
-  res.json({
-    success: true,
-    data: {
+    return {
       stats: {
-        totalUsers,
-        totalOwners,
-        totalTenants,
-        totalProperties,
-        totalBookings,
-        totalPayments,
-        totalRevenue,
-        activeBookings,
-        activeProperties,
-        failedPayments,
-        successPayments,
+        totalUsers, totalOwners, totalTenants, totalProperties,
+        totalBookings, totalPayments, totalRevenue: revenueAgg[0]?.total || 0,
+        activeBookings, activeProperties, failedPayments, successPayments,
       },
       recentUsers,
       recentBookings,
       recentPayments,
       analytics: { userGrowth, revenueTrend, bookingTrend, propertyGrowth },
-    },
-  });
+    };
+  }, TTL.MEDIUM);
+
+  res.json({ success: true, data });
 });
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // USERS

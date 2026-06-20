@@ -152,13 +152,23 @@ propertySchema.pre('save', function (next) {
 });
 
 // ─── Indexes ─────────────────────────────────────────────────────────────────
+// Single field indexes
 propertySchema.index({ city: 1 });
 propertySchema.index({ type: 1 });
 propertySchema.index({ price: 1 });
-propertySchema.index({ title: 1 });
 propertySchema.index({ owner: 1 });
 propertySchema.index({ availability: 1 });
 propertySchema.index({ location: '2dsphere' }); // for geospatial queries
+
+// Compound indexes for common search patterns
+propertySchema.index({ availability: 1, city: 1, price: 1 });         // search by city+price
+propertySchema.index({ availability: 1, type: 1, price: 1 });         // search by type+price
+propertySchema.index({ availability: 1, rating: -1, reviewsCount: -1 }); // featured sort
+propertySchema.index({ availability: 1, viewCount: -1 });              // trending sort
+propertySchema.index({ availability: 1, wishlistCount: -1 });          // trending wishlist
+propertySchema.index({ owner: 1, availability: 1, createdAt: -1 });   // owner's properties
+propertySchema.index({ availability: 1, createdAt: -1 });              // newest available
+propertySchema.index({ city: 1, type: 1, availability: 1 });          // recommendation engine
 
 const Property = mongoose.model('Property', propertySchema);
 

@@ -4,6 +4,7 @@ import Payment from '../models/Payment.js';
 import Property from '../models/Property.js';
 import Review from '../models/Review.js';
 import Notification from '../models/Notification.js';
+import cache, { TTL, getOrSet } from '../services/cacheService.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // @desc    Get tenant dashboard analytics
@@ -12,82 +13,83 @@ import Notification from '../models/Notification.js';
 // ─────────────────────────────────────────────────────────────────────────────
 const getTenantDashboard = asyncHandler(async (req, res) => {
   const userId = req.user._id;
+  const cacheKey = `dashboard:tenant:${userId}`;
 
-  // Booking counts by status
-  const [bookings, payments, recentNotifications] = await Promise.all([
-    Booking.find({ user: userId })
-      .populate('property', 'title city images price')
-      .sort({ createdAt: -1 })
-      .lean(),
-    Payment.find({ user: userId })
-      .populate('property', 'title city')
-      .populate('booking', 'checkInDate checkOutDate totalAmount')
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean(),
-    Notification.find({ recipient: userId })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean(),
-  ]);
+  const data = await getOrSet(cacheKey, async () => {
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  const totalBookings = bookings.length;
-  const activeBookings = bookings.filter(
-    (b) => b.bookingStatus === 'confirmed'
-  ).length;
-  const completedBookings = bookings.filter(
-    (b) => b.bookingStatus === 'completed'
-  ).length;
-  const cancelledBookings = bookings.filter(
-    (b) => b.bookingStatus === 'cancelled'
-  ).length;
-  const pendingBookings = bookings.filter(
-    (b) => b.bookingStatus === 'pending'
-  ).length;
-
-  // Total spent (successful payments)
-  const totalSpent = await Payment.aggregate([
-    { $match: { user: userId, paymentStatus: 'success' } },
-    { $group: { _id: null, total: { $sum: '$amount' } } },
-  ]);
-
-  // Monthly booking trend (last 6 months)
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-  const bookingTrend = await Booking.aggregate([
-    { $match: { user: userId, createdAt: { $gte: sixMonthsAgo } } },
-    {
-      $group: {
-        _id: {
-          year: { $year: '$createdAt' },
-          month: { $month: '$createdAt' },
+    // Run all queries in parallel with targeted projections
+    const [bookingStats, recentBookings, payments, recentNotifications, totalSpentAgg, bookingTrend] = await Promise.all([
+      // Aggregate booking counts by status in ONE query instead of filtering in JS
+      Booking.aggregate([
+        { $match: { user: userId } },
+        { $group: { _id: '$bookingStatus', count: { $sum: 1 } } },
+      ]),
+      // Only fetch recent 5 for display — use compound index user+createdAt
+      Booking.find({ user: userId })
+        .select('property checkInDate checkOutDate bookingStatus totalAmount')
+        .populate('property', 'title city images price')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+      // Payments: limit 5 with projection
+      Payment.find({ user: userId })
+        .select('property booking amount paymentStatus transactionDate createdAt')
+        .populate('property', 'title city')
+        .populate('booking', 'checkInDate checkOutDate totalAmount')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+      // Notifications: limit 5 projection
+      Notification.find({ recipient: userId })
+        .select('type title message isRead createdAt')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+      // Total spent aggregation
+      Payment.aggregate([
+        { $match: { user: userId, paymentStatus: 'success' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      // Monthly booking trend
+      Booking.aggregate([
+        { $match: { user: userId, createdAt: { $gte: sixMonthsAgo } } },
+        {
+          $group: {
+            _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+            count: { $sum: 1 },
+          },
         },
-        count: { $sum: 1 },
-      },
-    },
-    { $sort: { '_id.year': 1, '_id.month': 1 } },
-  ]);
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
+      ]),
+    ]);
 
-  const recentBookings = bookings.slice(0, 5);
+    // Build stats from aggregation result
+    const statsMap = bookingStats.reduce((acc, { _id, count }) => {
+      acc[_id] = count;
+      return acc;
+    }, {});
 
-  res.status(200).json({
-    success: true,
-    data: {
+    const totalBookings = bookingStats.reduce((sum, s) => sum + s.count, 0);
+
+    return {
       stats: {
         totalBookings,
-        activeBookings,
-        completedBookings,
-        cancelledBookings,
-        pendingBookings,
-        totalSpent: totalSpent[0]?.total || 0,
+        activeBookings:    statsMap.confirmed  || 0,
+        completedBookings: statsMap.completed  || 0,
+        cancelledBookings: statsMap.cancelled  || 0,
+        pendingBookings:   statsMap.pending    || 0,
+        totalSpent:        totalSpentAgg[0]?.total || 0,
       },
       recentBookings,
       recentPayments: payments,
       recentNotifications,
       bookingTrend,
-    },
-  });
+    };
+  }, TTL.MEDIUM);
+
+  res.status(200).json({ success: true, data });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,171 +104,181 @@ const getOwnerDashboard = asyncHandler(async (req, res) => {
   }
 
   const userId = req.user._id;
+  const cacheKey = `dashboard:owner:${userId}`;
 
-  // Get owner's properties
-  const properties = await Property.find({ owner: userId }).lean();
-  const propertyIds = properties.map((p) => p._id);
+  const data = await getOrSet(cacheKey, async () => {
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  // All bookings for owner properties
-  const [allBookings, successPayments, recentNotifications] = await Promise.all(
-    [
+    // Step 1: get owner's properties (lean + projection)
+    const properties = await Property.find({ owner: userId })
+      .select('_id title city address images price availability rating reviewsCount')
+      .lean();
+    const propertyIds = properties.map((p) => p._id);
+
+    if (propertyIds.length === 0) {
+      return {
+        stats: { totalProperties: 0, activeBookings: 0, pendingBookings: 0,
+          completedBookings: 0, totalBookings: 0, totalRevenue: 0,
+          monthlyRevenue: 0, paidPayments: 0, pendingPayments: 0 },
+        recentBookings: [], recentPayments: [], recentReviews: [],
+        recentNotifications: [], propertyPerformance: [], revenueTrend: [], bookingTrend: [],
+      };
+    }
+
+    // Step 2: parallel queries
+    const [
+      bookingStats,
+      recentBookings,
+      successPayments,
+      recentNotifications,
+      revenueTrend,
+      bookingTrend,
+      pendingPaymentsCount,
+      recentReviews,
+    ] = await Promise.all([
+      // Aggregate booking counts
+      Booking.aggregate([
+        { $match: { property: { $in: propertyIds } } },
+        { $group: { _id: '$bookingStatus', count: { $sum: 1 } } },
+      ]),
+      // Recent 5 bookings
       Booking.find({ property: { $in: propertyIds } })
+        .select('user property checkInDate checkOutDate bookingStatus totalAmount createdAt')
         .populate('user', 'name email')
         .populate('property', 'title city images price')
         .sort({ createdAt: -1 })
+        .limit(5)
         .lean(),
-      Payment.find({
-        property: { $in: propertyIds },
-        paymentStatus: 'success',
-      })
+      // Successful payments (for revenue calc)
+      Payment.find({ property: { $in: propertyIds }, paymentStatus: 'success' })
+        .select('user property booking amount transactionDate createdAt')
         .populate('user', 'name email')
         .populate('property', 'title city')
         .populate('booking', 'checkInDate checkOutDate totalAmount')
         .sort({ transactionDate: -1 })
         .lean(),
+      // Recent notifications
       Notification.find({ recipient: userId })
+        .select('type title message isRead createdAt')
         .sort({ createdAt: -1 })
         .limit(5)
         .lean(),
-    ]
-  );
-
-  const totalProperties = properties.length;
-  const activeBookings = allBookings.filter(
-    (b) => b.bookingStatus === 'confirmed'
-  ).length;
-  const pendingBookings = allBookings.filter(
-    (b) => b.bookingStatus === 'pending'
-  ).length;
-  const completedBookings = allBookings.filter(
-    (b) => b.bookingStatus === 'completed'
-  ).length;
-
-  // Revenue calculations
-  const totalRevenue = successPayments.reduce(
-    (sum, p) => sum + (p.amount || 0),
-    0
-  );
-
-  // Monthly revenue (last 6 months)
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-  const revenueTrend = await Payment.aggregate([
-    {
-      $match: {
-        property: { $in: propertyIds },
-        paymentStatus: 'success',
-        transactionDate: { $gte: sixMonthsAgo },
-      },
-    },
-    {
-      $group: {
-        _id: {
-          year: { $year: '$transactionDate' },
-          month: { $month: '$transactionDate' },
+      // Revenue trend
+      Payment.aggregate([
+        {
+          $match: {
+            property: { $in: propertyIds },
+            paymentStatus: 'success',
+            transactionDate: { $gte: sixMonthsAgo },
+          },
         },
-        revenue: { $sum: '$amount' },
-        count: { $sum: 1 },
-      },
-    },
-    { $sort: { '_id.year': 1, '_id.month': 1 } },
-  ]);
-
-  // Booking trend (last 6 months)
-  const bookingTrend = await Booking.aggregate([
-    {
-      $match: {
-        property: { $in: propertyIds },
-        createdAt: { $gte: sixMonthsAgo },
-      },
-    },
-    {
-      $group: {
-        _id: {
-          year: { $year: '$createdAt' },
-          month: { $month: '$createdAt' },
+        {
+          $group: {
+            _id: { year: { $year: '$transactionDate' }, month: { $month: '$transactionDate' } },
+            revenue: { $sum: '$amount' },
+            count: { $sum: 1 },
+          },
         },
-        count: { $sum: 1 },
-      },
-    },
-    { $sort: { '_id.year': 1, '_id.month': 1 } },
-  ]);
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
+      ]),
+      // Booking trend
+      Booking.aggregate([
+        { $match: { property: { $in: propertyIds }, createdAt: { $gte: sixMonthsAgo } } },
+        {
+          $group: {
+            _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
+      ]),
+      // Pending payments count
+      Payment.countDocuments({ property: { $in: propertyIds }, paymentStatus: 'pending' }),
+      // Recent reviews
+      Review.find({ property: { $in: propertyIds } })
+        .select('user property rating comment createdAt')
+        .populate('user', 'name')
+        .populate('property', 'title')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+    ]);
 
-  // Current month revenue
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthlyRevenue = successPayments
-    .filter((p) => p.transactionDate && new Date(p.transactionDate) >= monthStart)
-    .reduce((sum, p) => sum + (p.amount || 0), 0);
+    const statsMap = bookingStats.reduce((acc, { _id, count }) => {
+      acc[_id] = count;
+      return acc;
+    }, {});
+    const totalBookings = bookingStats.reduce((sum, s) => sum + s.count, 0);
 
-  // Paid vs pending payments
-  const pendingPayments = await Payment.countDocuments({
-    property: { $in: propertyIds },
-    paymentStatus: 'pending',
-  });
-  const paidPayments = successPayments.length;
+    const totalRevenue = successPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
-  // Property performance
-  const propertyPerformance = await Promise.all(
-    properties.map(async (prop) => {
-      const propBookings = allBookings.filter(
-        (b) => b.property?._id?.toString() === prop._id.toString()
-      );
-      const propRevenue = successPayments
-        .filter((p) => p.property?._id?.toString() === prop._id.toString())
-        .reduce((sum, p) => sum + (p.amount || 0), 0);
-      const reviewCount = await Review.countDocuments({ property: prop._id });
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthlyRevenue = successPayments
+      .filter((p) => p.transactionDate && new Date(p.transactionDate) >= monthStart)
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
 
-      return {
-        _id: prop._id,
-        title: prop.title,
-        city: prop.city || prop.address?.city,
-        images: prop.images,
-        price: prop.price,
-        availability: prop.availability,
-        totalBookings: propBookings.length,
-        averageRating: prop.rating || 0,
-        reviewCount,
-        revenue: propRevenue,
-      };
-    })
-  );
+    // Property performance using in-memory join (avoids N queries)
+    const bookingMap = {};
+    const revenueMap = {};
 
-  // Recent reviews on owner's properties
-  const recentReviews = await Review.find({ property: { $in: propertyIds } })
-    .populate('user', 'name')
-    .populate('property', 'title')
-    .sort({ createdAt: -1 })
-    .limit(5)
-    .lean();
+    // Build per-property booking counts from aggregate
+    const allBookingsForPerf = await Booking.aggregate([
+      { $match: { property: { $in: propertyIds } } },
+      { $group: { _id: '$property', count: { $sum: 1 } } },
+    ]);
+    allBookingsForPerf.forEach(({ _id, count }) => { bookingMap[_id.toString()] = count; });
 
-  const recentBookings = allBookings.slice(0, 5);
-  const recentPayments = successPayments.slice(0, 5);
+    // Revenue per property from in-memory successPayments
+    successPayments.forEach((p) => {
+      const pid = p.property?._id?.toString() || p.property?.toString();
+      if (pid) revenueMap[pid] = (revenueMap[pid] || 0) + (p.amount || 0);
+    });
 
-  res.status(200).json({
-    success: true,
-    data: {
+    const propertyPerformance = properties.map((prop) => ({
+      _id:           prop._id,
+      title:         prop.title,
+      city:          prop.city || prop.address?.city,
+      images:        prop.images,
+      price:         prop.price,
+      availability:  prop.availability,
+      totalBookings: bookingMap[prop._id.toString()] || 0,
+      averageRating: prop.rating || 0,
+      reviewCount:   prop.reviewsCount || 0,
+      revenue:       revenueMap[prop._id.toString()] || 0,
+    }));
+
+    return {
       stats: {
-        totalProperties,
-        activeBookings,
-        pendingBookings,
-        completedBookings,
-        totalBookings: allBookings.length,
+        totalProperties: properties.length,
+        activeBookings:    statsMap.confirmed  || 0,
+        pendingBookings:   statsMap.pending    || 0,
+        completedBookings: statsMap.completed  || 0,
+        totalBookings,
         totalRevenue,
         monthlyRevenue,
-        paidPayments,
-        pendingPayments,
+        paidPayments:    successPayments.length,
+        pendingPayments: pendingPaymentsCount,
       },
       recentBookings,
-      recentPayments,
+      recentPayments: successPayments.slice(0, 5),
       recentReviews,
       recentNotifications,
       propertyPerformance,
       revenueTrend,
       bookingTrend,
-    },
-  });
+    };
+  }, TTL.MEDIUM);
+
+  res.status(200).json({ success: true, data });
 });
+
+// Invalidate dashboard cache when data changes (exported for use in other controllers)
+export const invalidateDashboardCache = async (userId) => {
+  if (!userId) return;
+  await cache.invalidatePattern(`dashboard:tenant:${userId}`);
+  await cache.invalidatePattern(`dashboard:owner:${userId}`);
+};
 
 export { getTenantDashboard, getOwnerDashboard };

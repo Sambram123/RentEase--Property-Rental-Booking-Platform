@@ -2,15 +2,18 @@
  * Recommendation Engine
  * Scores properties based on: user preferences, search history,
  * booking/wishlist history, viewCount, rating, and recency.
+ *
+ * Day 22: Added caching for trending/featured queries to reduce DB load.
  */
 
 import Property from '../models/Property.js';
 import Booking from '../models/Booking.js';
 import User from '../models/User.js';
+import cache, { TTL, getOrSet } from './cacheService.js';
 
 const MAX_RESULTS = 12;
 const RECENTLY_VIEWED_LIMIT = 20;
-const SEARCH_HISTORY_LIMIT = 20;
+const SEARCH_HISTORY_LIMIT  = 20;
 
 // ─── Trending score formula ────────────────────────────────────────────────────
 const trendingScore = (p) => {
@@ -21,8 +24,20 @@ const trendingScore = (p) => {
   return views * 1 + rating * 20 + reviews * 5 + wishlist * 10;
 };
 
-// ─── Get trending properties ──────────────────────────────────────────────────
+// ─── Get trending properties (cached) ────────────────────────────────────────
 export const getTrendingProperties = async ({ limit = MAX_RESULTS, excludeIds = [] } = {}) => {
+  // Skip cache when caller has specific excludeIds (personalised context)
+  if (excludeIds.length > 0) {
+    return _fetchTrending(limit, excludeIds);
+  }
+  return getOrSet(
+    `recommendations:trending:${limit}`,
+    () => _fetchTrending(limit, []),
+    TTL.LONG
+  );
+};
+
+const _fetchTrending = async (limit, excludeIds) => {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const props = await Property.find({
@@ -36,6 +51,7 @@ export const getTrendingProperties = async ({ limit = MAX_RESULTS, excludeIds = 
       { createdAt: { $gte: sevenDaysAgo } },
     ],
   })
+    .select('_id title city address type price images rating reviewsCount viewCount wishlistCount availability owner')
     .populate('owner', 'name avatar')
     .lean();
 
@@ -44,13 +60,25 @@ export const getTrendingProperties = async ({ limit = MAX_RESULTS, excludeIds = 
     .slice(0, limit);
 };
 
-// ─── Get featured properties (high rating + availability) ─────────────────────
+// ─── Get featured properties (cached) ────────────────────────────────────────
 export const getFeaturedProperties = async ({ limit = MAX_RESULTS, excludeIds = [] } = {}) => {
+  if (excludeIds.length > 0) {
+    return _fetchFeatured(limit, excludeIds);
+  }
+  return getOrSet(
+    `recommendations:featured:${limit}`,
+    () => _fetchFeatured(limit, []),
+    TTL.LONG
+  );
+};
+
+const _fetchFeatured = async (limit, excludeIds) => {
   return Property.find({
     availability: true,
     _id: { $nin: excludeIds },
     rating: { $gte: 3 },
   })
+    .select('_id title city address type price images rating reviewsCount viewCount wishlistCount availability owner')
     .populate('owner', 'name avatar')
     .sort({ rating: -1, reviewsCount: -1, createdAt: -1 })
     .limit(limit)
@@ -65,38 +93,42 @@ export const getSimilarProperties = async (property, { limit = 6, excludeId = nu
   const priceLow  = price * 0.6;
   const priceHigh = price * 1.4;
 
-  const filter = {
-    availability: true,
-    _id: { $ne: excludeId || property._id },
-    $or: [
-      { city: city },
-      { type: type },
-      { price: { $gte: priceLow, $lte: priceHigh } },
-    ],
-  };
+  const cacheKey = `recommendations:similar:${property._id}:${limit}`;
+  return getOrSet(cacheKey, async () => {
+    const filter = {
+      availability: true,
+      _id: { $ne: excludeId || property._id },
+      $or: [
+        { city },
+        { type },
+        { price: { $gte: priceLow, $lte: priceHigh } },
+      ],
+    };
 
-  const props = await Property.find(filter)
-    .populate('owner', 'name avatar')
-    .lean();
+    const props = await Property.find(filter)
+      .select('_id title city address type price images rating reviewsCount viewCount wishlistCount availability owner')
+      .populate('owner', 'name avatar')
+      .lean();
 
-  // Score: same city=3pts, same type=2pts, price range=1pt, rating bonus
-  return props
-    .map((p) => {
-      let score = 0;
-      if (p.city === city) score += 3;
-      if (p.type === type) score += 2;
-      if (p.price >= priceLow && p.price <= priceHigh) score += 1;
-      score += (p.rating || 0) * 0.5;
-      return { ...p, _score: score };
-    })
-    .sort((a, b) => b._score - a._score)
-    .slice(0, limit)
-    .map(({ _score, ...p }) => p);
+    return props
+      .map((p) => {
+        let score = 0;
+        if (p.city === city) score += 3;
+        if (p.type === type) score += 2;
+        if (p.price >= priceLow && p.price <= priceHigh) score += 1;
+        score += (p.rating || 0) * 0.5;
+        return { ...p, _score: score };
+      })
+      .sort((a, b) => b._score - a._score)
+      .slice(0, limit)
+      .map(({ _score, ...p }) => p);
+  }, TTL.MEDIUM);
 };
 
 // ─── Get personalized recommendations ─────────────────────────────────────────
 export const getPersonalizedRecommendations = async (userId, { limit = MAX_RESULTS } = {}) => {
   const user = await User.findById(userId)
+    .select('recentlyViewed preferredCities preferredPropertyTypes searchHistory wishlist')
     .populate('recentlyViewed.property', 'city type price')
     .lean();
 
@@ -120,8 +152,8 @@ export const getPersonalizedRecommendations = async (userId, { limit = MAX_RESUL
 
   // Get booking history city preferences
   const bookings = await Booking.find({ user: userId })
-    .populate('property', 'city type')
     .select('property')
+    .populate('property', 'city type')
     .lean();
 
   bookings.forEach(({ property }) => {
@@ -134,14 +166,9 @@ export const getPersonalizedRecommendations = async (userId, { limit = MAX_RESUL
     ...(user.wishlist || []),
   ].filter(Boolean);
 
-  // Build query
   const orConditions = [];
-  if (preferredCities.size > 0) {
-    orConditions.push({ city: { $in: [...preferredCities] } });
-  }
-  if (preferredTypes.size > 0) {
-    orConditions.push({ type: { $in: [...preferredTypes] } });
-  }
+  if (preferredCities.size > 0) orConditions.push({ city: { $in: [...preferredCities] } });
+  if (preferredTypes.size  > 0) orConditions.push({ type: { $in: [...preferredTypes]  } });
   orConditions.push({ rating: { $gte: 4 } });
 
   const filter = {
@@ -151,10 +178,10 @@ export const getPersonalizedRecommendations = async (userId, { limit = MAX_RESUL
   };
 
   const props = await Property.find(filter)
+    .select('_id title city address type price images rating reviewsCount viewCount wishlistCount availability owner')
     .populate('owner', 'name avatar')
     .lean();
 
-  // Score properties
   return props
     .map((p) => {
       let score = 0;
@@ -190,6 +217,9 @@ export const trackRecentlyViewed = async (userId, propertyId) => {
     }
 
     await user.save();
+
+    // Invalidate personalised cache for user
+    await cache.del(`recommendations:personalized:${userId}`);
   } catch {
     // best-effort — don't break the main flow
   }
@@ -200,7 +230,8 @@ export const trackSearch = async (userId, { q, city, type, minPrice, maxPrice })
   try {
     if (!q && !city && !type) return; // skip empty/unfiltered searches
 
-    const user = await User.findById(userId).select('searchHistory preferredCities preferredPropertyTypes');
+    const user = await User.findById(userId)
+      .select('searchHistory preferredCities preferredPropertyTypes');
     if (!user) return;
 
     // Add to search history
@@ -213,7 +244,6 @@ export const trackSearch = async (userId, { q, city, type, minPrice, maxPrice })
       user.searchHistory = user.searchHistory.slice(0, SEARCH_HISTORY_LIMIT);
     }
 
-    // Update preference lists
     if (city && !user.preferredCities.includes(city)) {
       user.preferredCities.unshift(city);
       if (user.preferredCities.length > 10) user.preferredCities = user.preferredCities.slice(0, 10);

@@ -5,6 +5,8 @@ import helmet from 'helmet';
 import xssFilters from 'xss-filters';
 import hpp from 'hpp';
 import { globalLimiter } from './rateLimiter.js';
+import performanceMiddleware from './performanceMiddleware.js';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom NoSQL injection sanitizer compatible with Express 5
@@ -135,6 +137,9 @@ const applyMiddleware = (app) => {
     })
   );
 
+  // ── Performance tracking ─────────────────────────────────────────────────
+  app.use(performanceMiddleware);
+
   // ── Global rate limiter on all API routes ────────────────────────────────
   app.use('/api', globalLimiter);
 
@@ -143,3 +148,4 @@ const applyMiddleware = (app) => {
 };
 
 export default applyMiddleware;
+
