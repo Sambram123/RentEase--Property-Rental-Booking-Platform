@@ -1,6 +1,8 @@
+import { memo, useCallback } from 'react';
 import { FiMessageSquare, FiSearch, FiUser, FiTrash2, FiArchive, FiInbox } from 'react-icons/fi';
 import { useChat } from '../context/ChatContext';
 import { getUserAvatar } from '../utils/avatar';
+
 
 const fmtTime = (d) => {
   const now = new Date();
@@ -18,7 +20,7 @@ const fmtTime = (d) => {
 
 const PLACEHOLDER = 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=200&q=40';
 
-const ConversationList = ({
+const ConversationList = memo(({
   conversations,
   activeId,
   onSelect,
@@ -225,6 +227,8 @@ const ConversationList = ({
       </div>
     </div>
   );
-};
+});
+
+ConversationList.displayName = 'ConversationList';
 
 export default ConversationList;

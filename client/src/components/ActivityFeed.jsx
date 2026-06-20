@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { FiBell, FiChevronRight } from 'react-icons/fi';
 import { fetchNotifications } from '../services/notificationService';
@@ -29,7 +29,7 @@ const fmtTime = (d) => {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
 };
 
-const ActivityFeed = ({ maxItems = 5 }) => {
+const ActivityFeed = memo(({ maxItems = 5 }) => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -102,6 +102,8 @@ const ActivityFeed = ({ maxItems = 5 }) => {
       )}
     </div>
   );
-};
+});
+
+ActivityFeed.displayName = 'ActivityFeed';
 
 export default ActivityFeed;

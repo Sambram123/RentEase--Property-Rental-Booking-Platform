@@ -1,3 +1,4 @@
+import { memo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FiMapPin, FiStar } from 'react-icons/fi';
 import { formatPrice } from '../utils/constants';
@@ -5,20 +6,24 @@ import { formatPrice } from '../utils/constants';
 const PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80';
 
-const PropertyCard = ({ property }) => {
+const PropertyCard = memo(({ property }) => {
   // Support both legacy mock shape (id, location, pricePerMonth, image)
   // and real API shape (_id, city, price, images[])
-  const id           = property._id  || property.id;
-  const title        = property.title;
-  const location     = property.city || property.address?.city || property.location || '';
-  const price        = property.price ?? property.pricePerMonth ?? 0;
-  const bedrooms     = property.bedrooms  ?? 0;
-  const bathrooms    = property.bathrooms ?? 0;
-  const rating       = property.rating;
-  const image        =
+  const id       = property._id  || property.id;
+  const title    = property.title;
+  const location = property.city || property.address?.city || property.location || '';
+  const price    = property.price ?? property.pricePerMonth ?? 0;
+  const bedrooms  = property.bedrooms  ?? 0;
+  const bathrooms = property.bathrooms ?? 0;
+  const rating    = property.rating;
+  const image     =
     (Array.isArray(property.images) && property.images[0]) ||
     property.image ||
     PLACEHOLDER_IMAGE;
+
+  const handleImgError = useCallback((e) => {
+    e.currentTarget.src = PLACEHOLDER_IMAGE;
+  }, []);
 
   return (
     <Link
@@ -32,7 +37,8 @@ const PropertyCard = ({ property }) => {
           alt={title}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
           loading="lazy"
-          onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }}
+          decoding="async"
+          onError={handleImgError}
         />
         {rating > 0 && (
           <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-xs font-medium shadow-sm">
@@ -72,6 +78,8 @@ const PropertyCard = ({ property }) => {
       </div>
     </Link>
   );
-};
+});
+
+PropertyCard.displayName = 'PropertyCard';
 
 export default PropertyCard;

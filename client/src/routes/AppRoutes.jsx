@@ -1,28 +1,42 @@
+import { Suspense, lazy, memo } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
+
+// ─── Eagerly loaded (critical path — above fold on first visit) ───────────────
 import Home from '../pages/Home';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import Properties from '../pages/Properties';
 import PropertyDetails from '../pages/PropertyDetails';
-import AddProperty from '../pages/AddProperty';
-import Dashboard from '../pages/Dashboard';
-import OwnerDashboard from '../pages/OwnerDashboard';
-import AdminDashboard from '../pages/AdminDashboard';
-import MyBookings from '../pages/MyBookings';
-import MyPayments from '../pages/MyPayments';
-import PaymentSuccess from '../pages/PaymentSuccess';
-import PaymentFailed from '../pages/PaymentFailed';
-import EditProperty from '../pages/EditProperty';
-import Wishlist from '../pages/Wishlist';
-import Notifications from '../pages/Notifications';
-import Messages from '../pages/Messages';
-import Profile from '../pages/Profile';
-import Settings from '../pages/Settings';
 import NotFound from '../pages/NotFound';
-import AvailabilityCalendar from '../pages/AvailabilityCalendar';
 import ProtectedRoute from '../components/ProtectedRoute';
 import AdminRoute from '../components/AdminRoute';
+
+// ─── Lazily loaded (authenticated / heavy pages) ─────────────────────────────
+const Dashboard            = lazy(() => import('../pages/Dashboard'));
+const OwnerDashboard       = lazy(() => import('../pages/OwnerDashboard'));
+const AdminDashboard       = lazy(() => import('../pages/AdminDashboard'));
+const MyBookings           = lazy(() => import('../pages/MyBookings'));
+const MyPayments           = lazy(() => import('../pages/MyPayments'));
+const PaymentSuccess       = lazy(() => import('../pages/PaymentSuccess'));
+const PaymentFailed        = lazy(() => import('../pages/PaymentFailed'));
+const EditProperty         = lazy(() => import('../pages/EditProperty'));
+const AddProperty          = lazy(() => import('../pages/AddProperty'));
+const Wishlist             = lazy(() => import('../pages/Wishlist'));
+const Notifications        = lazy(() => import('../pages/Notifications'));
+const Messages             = lazy(() => import('../pages/Messages'));
+const Profile              = lazy(() => import('../pages/Profile'));
+const Settings             = lazy(() => import('../pages/Settings'));
+const AvailabilityCalendar = lazy(() => import('../pages/AvailabilityCalendar'));
+
+// ─── Suspense fallback ────────────────────────────────────────────────────────
+const PageLoader = memo(() => (
+  <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+    <span className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+    <p className="text-sm text-muted animate-pulse">Loading…</p>
+  </div>
+));
+PageLoader.displayName = 'PageLoader';
 
 const AppRoutes = () => {
   return (
@@ -40,7 +54,9 @@ const AppRoutes = () => {
           path="dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <Suspense fallback={<PageLoader />}>
+                <Dashboard />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -48,7 +64,9 @@ const AppRoutes = () => {
           path="my-bookings"
           element={
             <ProtectedRoute>
-              <MyBookings />
+              <Suspense fallback={<PageLoader />}>
+                <MyBookings />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -56,7 +74,9 @@ const AppRoutes = () => {
           path="my-payments"
           element={
             <ProtectedRoute>
-              <MyPayments />
+              <Suspense fallback={<PageLoader />}>
+                <MyPayments />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -64,7 +84,9 @@ const AppRoutes = () => {
           path="payment/success"
           element={
             <ProtectedRoute>
-              <PaymentSuccess />
+              <Suspense fallback={<PageLoader />}>
+                <PaymentSuccess />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -72,7 +94,9 @@ const AppRoutes = () => {
           path="payment/failed"
           element={
             <ProtectedRoute>
-              <PaymentFailed />
+              <Suspense fallback={<PageLoader />}>
+                <PaymentFailed />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -80,7 +104,9 @@ const AppRoutes = () => {
           path="wishlist"
           element={
             <ProtectedRoute>
-              <Wishlist />
+              <Suspense fallback={<PageLoader />}>
+                <Wishlist />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -88,7 +114,9 @@ const AppRoutes = () => {
           path="notifications"
           element={
             <ProtectedRoute>
-              <Notifications />
+              <Suspense fallback={<PageLoader />}>
+                <Notifications />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -96,16 +124,19 @@ const AppRoutes = () => {
           path="messages"
           element={
             <ProtectedRoute>
-              <Messages />
+              <Suspense fallback={<PageLoader />}>
+                <Messages />
+              </Suspense>
             </ProtectedRoute>
           }
         />
         <Route
           path="profile"
-
           element={
             <ProtectedRoute>
-              <Profile />
+              <Suspense fallback={<PageLoader />}>
+                <Profile />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -113,7 +144,9 @@ const AppRoutes = () => {
           path="settings"
           element={
             <ProtectedRoute>
-              <Settings />
+              <Suspense fallback={<PageLoader />}>
+                <Settings />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -123,7 +156,9 @@ const AppRoutes = () => {
           path="properties/add"
           element={
             <ProtectedRoute allowedRoles={['owner', 'admin']}>
-              <AddProperty />
+              <Suspense fallback={<PageLoader />}>
+                <AddProperty />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -131,7 +166,9 @@ const AppRoutes = () => {
           path="properties/:id/edit"
           element={
             <ProtectedRoute allowedRoles={['owner', 'admin']}>
-              <EditProperty />
+              <Suspense fallback={<PageLoader />}>
+                <EditProperty />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -139,7 +176,9 @@ const AppRoutes = () => {
           path="owner/dashboard"
           element={
             <ProtectedRoute allowedRoles={['owner', 'admin']}>
-              <OwnerDashboard />
+              <Suspense fallback={<PageLoader />}>
+                <OwnerDashboard />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -147,7 +186,9 @@ const AppRoutes = () => {
           path="availability/:propertyId"
           element={
             <ProtectedRoute allowedRoles={['owner', 'admin']}>
-              <AvailabilityCalendar />
+              <Suspense fallback={<PageLoader />}>
+                <AvailabilityCalendar />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -157,7 +198,9 @@ const AppRoutes = () => {
           path="admin/*"
           element={
             <AdminRoute>
-              <AdminDashboard />
+              <Suspense fallback={<PageLoader />}>
+                <AdminDashboard />
+              </Suspense>
             </AdminRoute>
           }
         />
@@ -170,4 +213,3 @@ const AppRoutes = () => {
 };
 
 export default AppRoutes;
-
