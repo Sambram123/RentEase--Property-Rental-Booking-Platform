@@ -93,10 +93,10 @@ const Messages = () => {
   });
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-4 sm:py-6 sm:px-6 lg:px-8">
       <div
         className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
-        style={{ height: 'calc(100vh - 140px)', minHeight: '500px' }}
+        style={{ height: 'calc(100dvh - 140px)', minHeight: '400px' }}
       >
         <div className="flex h-full">
           {/* Sidebar — conversations */}
