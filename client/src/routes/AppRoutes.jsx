@@ -31,9 +31,28 @@ const AvailabilityCalendar = lazy(() => import('../pages/AvailabilityCalendar'))
 
 // ─── Suspense fallback ────────────────────────────────────────────────────────
 const PageLoader = memo(() => (
-  <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
-    <span className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-    <p className="text-sm text-muted animate-pulse">Loading…</p>
+  <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="mb-6 h-8 w-48 animate-pulse rounded-lg bg-gray-200" />
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {[1,2,3,4].map(i => (
+        <div key={i} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+          <div className="mb-3 h-10 w-10 animate-pulse rounded-xl bg-gray-200" />
+          <div className="mb-2 h-6 w-16 animate-pulse rounded bg-gray-200" />
+          <div className="h-3 w-24 animate-pulse rounded bg-gray-200" />
+        </div>
+      ))}
+    </div>
+    <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {[1,2,3].map(i => (
+        <div key={i} className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+          <div className="h-52 w-full animate-pulse bg-gray-200" />
+          <div className="space-y-2 p-4">
+            <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-gray-200" />
+          </div>
+        </div>
+      ))}
+    </div>
   </div>
 ));
 PageLoader.displayName = 'PageLoader';

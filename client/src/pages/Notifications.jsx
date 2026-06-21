@@ -3,6 +3,7 @@ import {
   FiBell, FiCheck, FiCheckCircle, FiTrash2, FiChevronLeft,
   FiChevronRight, FiInbox, FiFilter,
 } from 'react-icons/fi';
+import { MdNotificationsActive } from 'react-icons/md';
 import toast from 'react-hot-toast';
 import {
   fetchNotifications,
@@ -11,6 +12,7 @@ import {
   deleteNotification,
 } from '../services/notificationService';
 import { useNotifications, getNotifConfig } from '../context/NotificationContext';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 import Loader from '../components/Loader';
 
 const fmtTime = (d) => {
@@ -46,11 +48,26 @@ const FILTER_TABS = [
 
 const Notifications = () => {
   const { refreshUnreadCount, decrementUnread, clearUnreadCount } = useNotifications();
+  const { permission, isSupported, requestPermission } = usePushNotifications();
   const [notifications, setNotifications] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [actionLoading, setActionLoading] = useState(null);
+  const [permDismissed, setPermDismissed] = useState(
+    () => localStorage.getItem('push-perm-dismissed') === 'true'
+  );
+
+  const handleEnableNotifications = async () => {
+    const result = await requestPermission();
+    if (result === 'granted') {
+      toast.success('Push notifications enabled!');
+    } else if (result === 'denied') {
+      toast.error('Notification permission denied. Enable in browser settings.');
+    }
+    setPermDismissed(true);
+    localStorage.setItem('push-perm-dismissed', 'true');
+  };
 
   // ── Fetch notifications ─────────────────────────────────────────────────
   const loadNotifications = useCallback(async (page = 1) => {
@@ -144,6 +161,35 @@ const Notifications = () => {
           </button>
         )}
       </div>
+
+      {/* ── Push notification permission banner ─────────────────────── */}
+      {isSupported && permission === 'default' && !permDismissed && (
+        <div className="mb-6 flex items-center gap-4 rounded-2xl border border-primary/20 bg-primary/[0.04] p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <MdNotificationsActive className="h-5 w-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-secondary">Enable Push Notifications</p>
+            <p className="text-xs text-muted">Get notified about bookings, payments and messages</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={handleEnableNotifications}
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary-dark"
+            >
+              Enable
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPermDismissed(true); localStorage.setItem('push-perm-dismissed', 'true'); }}
+              className="rounded-lg px-2 py-1.5 text-xs text-muted transition hover:text-secondary"
+            >
+              Later
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Filter tabs ────────────────────────────────────────────── */}
       <div className="mb-6 flex gap-2">

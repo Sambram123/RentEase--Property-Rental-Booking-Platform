@@ -11,4 +11,139 @@
 body {
   @apply bg-white text-secondary antialiased;
   font-family: var(--font-sans);
+  /* Prevent horizontal scroll on mobile */
+  overflow-x: hidden;
+  /* Better text rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── PWA / Mobile optimizations ────────────────────────────────────────── */
+
+/* Safe area padding for notched devices */
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Minimum touch target size only for interactive controls — NOT raw anchors */
+button,
+[role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* But allow small inline links/buttons to be smaller when needed */
+.touch-target-none {
+  min-height: unset;
+  min-width: unset;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Remove tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Better focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Smooth image rendering */
+img {
+  image-rendering: auto;
+}
+
+/* Prevent text selection on interactive elements */
+button,
+[role="button"] {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Scrollbar styling ──────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* ── PWA standalone mode adjustments ───────────────────────────────────── */
+@media (display-mode: standalone) {
+  /* Add top padding for status bar in standalone mode */
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* ── Shimmer animation for skeleton loaders ─────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ── Page transition ─────────────────────────────────────────────────────── */
+.page-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* ── Mobile-specific overrides ──────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Better card spacing on mobile */
+  .mobile-card {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    border-radius: 0;
+  }
+
+  /* Stack horizontal layouts on mobile */
+  .mobile-stack {
+    flex-direction: column;
+  }
+}
+
+/* ── Tablet-specific ────────────────────────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tablet-2col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Overscroll bounce prevention on iOS ───────────────────────────────── */
+html {
+  overscroll-behavior: none;
+}
+
+main {
+  overscroll-behavior-y: auto;
 }

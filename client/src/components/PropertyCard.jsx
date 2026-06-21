@@ -1,7 +1,8 @@
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { FiMapPin, FiStar } from 'react-icons/fi';
 import { formatPrice } from '../utils/constants';
+import LazyImage from './LazyImage';
 
 const PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80';
@@ -21,10 +22,6 @@ const PropertyCard = memo(({ property }) => {
     property.image ||
     PLACEHOLDER_IMAGE;
 
-  const handleImgError = useCallback((e) => {
-    e.currentTarget.src = PLACEHOLDER_IMAGE;
-  }, []);
-
   return (
     <Link
       to={`/properties/${id}`}
@@ -32,13 +29,12 @@ const PropertyCard = memo(({ property }) => {
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden">
-        <img
+        <LazyImage
           src={image}
           alt={title}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-          loading="lazy"
-          decoding="async"
-          onError={handleImgError}
+          placeholderClassName="aspect-[4/3]"
+          fallback={<img src={PLACEHOLDER_IMAGE} alt={title} className="h-full w-full object-cover" />}
         />
         {rating > 0 && (
           <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-xs font-medium shadow-sm">

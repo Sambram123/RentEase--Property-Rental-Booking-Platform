@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff385c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e31c5f;stop-opacity:1" />
+    </linearGradient>
+    <clipPath id="rounded">
+      <rect width="72" height="72" rx="16" ry="16"/>
+    </clipPath>
+  </defs>
+  <rect width="72" height="72" rx="16" ry="16" fill="url(#bg)"/>
+  <!-- House icon -->
+  <g transform="translate(36, 36)" fill="white" opacity="0.95">
+    <!-- Roof -->
+    <polygon points="-23.04,-1.44 0,-23.04 23.04,-1.44" />
+    <!-- Chimney -->
+    <rect x="7.2" y="-25.919999999999998" width="5.76" height="8.64" rx="1"/>
+    <!-- Wall -->
+    <rect x="-19.44" y="-1.44" width="38.88" height="23.04" rx="1.44"/>
+    <!-- Door -->
+    <rect x="-5.040000000000001" y="8.64" width="10.080000000000002" height="12.959999999999999" rx="1.44" fill="rgba(255,56,92,0.4)"/>
+    <!-- Windows -->
+    <rect x="-14.4" y="2.88" width="7.2" height="7.2" rx="0.72" fill="rgba(255,56,92,0.35)"/>
+    <rect x="7.2" y="2.88" width="7.2" height="7.2" rx="0.72" fill="rgba(255,56,92,0.35)"/>
+  </g>
+</svg>

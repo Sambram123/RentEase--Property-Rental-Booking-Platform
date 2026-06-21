@@ -82,6 +82,18 @@ export const NotificationProvider = ({ children }) => {
         }
       );
 
+      // Browser push notification (if granted and page is not focused)
+      if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+        try {
+          new Notification(notif.title, {
+            body: notif.message,
+            icon: '/icons/icon-192x192.svg',
+            badge: '/icons/icon-72x72.svg',
+            tag: notif._id,
+          });
+        } catch { /* non-fatal */ }
+      }
+
       // Prepend to recent list (keep max 20)
       setRecentNotifications((prev) => [notif, ...prev].slice(0, 20));
     });
