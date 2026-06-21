@@ -5,6 +5,7 @@ import {
   FiHome, FiArrowRight, FiClock,
 } from 'react-icons/fi';
 import PropertyCard from '../components/PropertyCard';
+import LazyImage from '../components/LazyImage';
 import Loader from '../components/Loader';
 import { healthCheck } from '../services/api';
 import { fetchTrending, fetchFeatured, fetchPopularCities } from '../services/recommendationService';
@@ -27,11 +28,12 @@ const PropertyMiniCard = ({ property }) => {
       id={`home-prop-${property._id}`}
     >
       <div className="relative h-44 overflow-hidden">
-        <img
+        <LazyImage
           src={img}
           alt={property.title}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-          onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
+          placeholderClassName="h-44"
+          fallback={<img src={PLACEHOLDER} alt={property.title} className="h-full w-full object-cover" />}
         />
         <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold capitalize text-secondary shadow-sm">
           {property.type}
