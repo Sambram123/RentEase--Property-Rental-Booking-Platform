@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FiHeart, FiTrash2, FiMapPin } from 'react-icons/fi';
 import toast from 'react-hot-toast';
-import Loader from '../components/Loader';
 import StarRating from '../components/StarRating';
+import LazyImage from '../components/LazyImage';
+import { PropertyGridSkeleton } from '../components/SkeletonLoaders';
 import { fetchWishlist, removeFromWishlist } from '../services/wishlistService';
 import { formatPrice } from '../utils/constants';
 
@@ -44,8 +45,9 @@ const Wishlist = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader size="lg" />
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mb-8 h-8 w-40 animate-pulse rounded-lg bg-gray-200" />
+        <PropertyGridSkeleton count={6} />
       </div>
     );
   }
@@ -95,12 +97,12 @@ const Wishlist = () => {
               >
                 {/* Image */}
                 <Link to={`/properties/${property._id}`} className="relative block aspect-[4/3] overflow-hidden">
-                  <img
+                  <LazyImage
                     src={image}
                     alt={property.title}
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                    loading="lazy"
-                    onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
+                    placeholderClassName="aspect-[4/3]"
+                    fallback={<img src={PLACEHOLDER} alt={property.title} className="h-full w-full object-cover" />}
                   />
                   {property.rating > 0 && (
                     <div className="absolute right-3 top-3">
