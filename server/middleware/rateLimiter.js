@@ -12,11 +12,11 @@ const rateLimitHandler = (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Global API rate limiter — applied to all /api/* routes
-// 100 requests per 15 minutes per IP
+// 1000 requests per 15 minutes per IP
 // ─────────────────────────────────────────────────────────────────────────────
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
