@@ -284,17 +284,120 @@ const Home = () => {
 
       {/* ── Why RentEase ─────────────────────────────────────────────────── */}
       <section className="border-t border-gray-100 bg-gray-50/50 px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-3">
-          {[
-            { title: 'Verified listings', desc: 'Every property is reviewed for quality and accuracy before going live.' },
-            { title: 'Secure payments', desc: 'Pay advance rent safely with Razorpay-powered checkout.' },
-            { title: 'Easy booking', desc: 'Book your apartment in minutes with a simple, guided flow.' },
-          ].map((item) => (
-            <div key={item.title} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h3 className="font-semibold text-secondary">{item.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{item.desc}</p>
-            </div>
-          ))}
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-10 text-center">
+            <h2 className="text-2xl font-bold text-secondary sm:text-3xl">Why choose RentEase?</h2>
+            <p className="mt-2 text-muted">Everything you need to find your perfect rental</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {[
+              { emoji: '🔍', title: 'Verified listings', desc: 'Every property is reviewed for quality and accuracy before going live on our platform.' },
+              { emoji: '🔒', title: 'Secure payments', desc: 'Pay advance rent safely with Razorpay-powered checkout. Your money is always protected.' },
+              { emoji: '⚡', title: 'Instant booking', desc: 'Book your apartment in minutes with a simple, guided flow — no paperwork hassle.' },
+            ].map((item) => (
+              <div key={item.title} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                <span className="text-3xl">{item.emoji}</span>
+                <h3 className="mt-3 font-semibold text-secondary">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Platform Stats ────────────────────────────────────────────────── */}
+      <section className="bg-primary px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid grid-cols-2 gap-8 text-center text-white md:grid-cols-4">
+            {[
+              { value: '10,000+', label: 'Properties listed' },
+              { value: '50,000+', label: 'Happy tenants' },
+              { value: '8 Cities', label: 'Pan-India coverage' },
+              { value: '4.8★',    label: 'Average rating' },
+            ].map(({ value, label }) => (
+              <div key={label}>
+                <p className="text-3xl font-bold sm:text-4xl">{value}</p>
+                <p className="mt-1 text-sm text-white/80">{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Testimonials ─────────────────────────────────────────────────── */}
+      <section className="border-t border-gray-100 bg-white px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-10 text-center">
+            <h2 className="text-2xl font-bold text-secondary sm:text-3xl">What our tenants say</h2>
+            <p className="mt-2 text-muted">Real experiences from real renters</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {[
+              {
+                name: 'Priya Sharma',
+                city: 'Bangalore',
+                rating: 5,
+                text: 'Found my perfect 2 BHK in Koramangala within 3 days. The booking process was seamless and the owner was very responsive.',
+                avatar: '👩‍💼',
+              },
+              {
+                name: 'Rahul Mehta',
+                city: 'Mumbai',
+                rating: 5,
+                text: 'RentEase made relocating to Mumbai so much easier. Transparent pricing, verified listings, and secure payments. Highly recommend!',
+                avatar: '👨‍💻',
+              },
+              {
+                name: 'Anjali Reddy',
+                city: 'Hyderabad',
+                rating: 5,
+                text: 'Booked a studio near my office in minutes. The advance payment via Razorpay was smooth and I got instant confirmation.',
+                avatar: '👩‍🎓',
+              },
+            ].map((t) => (
+              <div key={t.name} className="rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
+                <div className="flex items-center gap-1 text-amber-400">
+                  {'★'.repeat(t.rating)}
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-secondary">"{t.text}"</p>
+                <div className="mt-4 flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xl">
+                    {t.avatar}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-secondary">{t.name}</p>
+                    <p className="text-xs text-muted">{t.city}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Final CTA ─────────────────────────────────────────────────────── */}
+      <section className="border-t border-gray-100 bg-gradient-to-b from-rose-50/60 to-white px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-2xl font-bold text-secondary sm:text-3xl">
+            Ready to find your next home?
+          </h2>
+          <p className="mt-3 text-muted">
+            Browse thousands of verified rental properties across India and book your perfect space today.
+          </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <a
+              href="/properties"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow transition hover:bg-primary-dark"
+            >
+              Browse Properties
+            </a>
+            <a
+              href="/register"
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-secondary shadow-sm transition hover:bg-gray-50"
+            >
+              Create free account
+            </a>
+          </div>
         </div>
       </section>
     </>

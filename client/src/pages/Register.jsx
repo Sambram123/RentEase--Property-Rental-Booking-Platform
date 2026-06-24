@@ -4,6 +4,7 @@ import { FiMail, FiLock, FiUser, FiEye, FiEyeOff } from 'react-icons/fi';
 import { FcGoogle } from 'react-icons/fc';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import SEO from '../components/SEO';
 
 const ROLES = [
   { value: 'tenant', label: '🏡 Tenant — looking for a rental' },
@@ -70,6 +71,7 @@ const Register = () => {
 
   return (
     <div className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4 py-12">
+      <SEO title="Create Account" description="Create your free RentEase account to book rental properties, list your property, or manage bookings." canonical="/register" noIndex />
       {/* Header */}
       <div className="text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
