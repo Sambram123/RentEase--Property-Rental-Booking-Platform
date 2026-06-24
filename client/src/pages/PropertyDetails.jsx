@@ -9,6 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
 import StarRating from '../components/StarRating';
+import SEO, { buildPropertySchema } from '../components/SEO';
 import { fetchPropertyById } from '../services/propertyService';
 import { createBooking } from '../services/bookingService';
 import { fetchCalendar } from '../services/availabilityService';
@@ -706,7 +707,15 @@ const PropertyDetails = () => {
     finally { setWishLoading(false); }
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
+    const shareData = {
+      title: property.title,
+      text: `Check out this rental property on RentEase: ${property.title}`,
+      url: window.location.href,
+    };
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      try { await navigator.share(shareData); return; } catch { /* fallback */ }
+    }
     navigator.clipboard.writeText(window.location.href);
     toast.success('Link copied to clipboard!');
   };
@@ -743,8 +752,31 @@ const PropertyDetails = () => {
   const fullAddr  = [address.street, address.city, address.state, address.country]
     .filter(Boolean).join(', ');
 
+  // ── SEO helpers ────────────────────────────────────────────────────────────
+  const seoTitle  = property.title;
+  const seoDesc   = property.description
+    ? property.description.slice(0, 155)
+    : `${property.type ? property.type.charAt(0).toUpperCase() + property.type.slice(1) : 'Property'} for rent in ${cityLabel}. ${formatPrice(property.price ?? 0)}/month. Book instantly on RentEase.`;
+  const seoImage  = images[0] || PLACEHOLDER_IMAGE;
+  const seoKeywords = [
+    property.type ? `${property.type} for rent` : '',
+    cityLabel ? `rental properties ${cityLabel}` : '',
+    cityLabel ? `apartments in ${cityLabel}` : '',
+    property.bedrooms ? `${property.bedrooms} BHK` : '',
+    'rent house', 'rental apartment India',
+  ].filter(Boolean).join(', ');
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <SEO
+        title={seoTitle}
+        description={seoDesc}
+        keywords={seoKeywords}
+        canonical={`/properties/${property._id}`}
+        ogImage={seoImage}
+        type="website"
+        structuredData={buildPropertySchema(property)}
+      />
       <Link
         to="/properties"
         className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-muted transition hover:text-primary"

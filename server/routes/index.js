@@ -14,6 +14,7 @@ import availabilityRoutes from './availabilityRoutes.js';
 import refundRoutes from './refundRoutes.js';
 import recommendationRoutes from './recommendationRoutes.js';
 import searchRoutes from './searchRoutes.js';
+import seoRoutes from './seoRoutes.js';
 
 const registerRoutes = (app) => {
   app.get('/api/health', (req, res) => {
@@ -38,6 +39,7 @@ const registerRoutes = (app) => {
   app.use('/api/refunds', refundRoutes);
   app.use('/api/recommendations', recommendationRoutes);
   app.use('/api/searches', searchRoutes);
+  app.use('/api/seo', seoRoutes);
   app.use('/api/test', testRoutes);
 };
 

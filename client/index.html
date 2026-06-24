@@ -14,12 +14,33 @@
     <meta name="apple-mobile-web-app-title" content="RentEase" />
     <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
 
-    <!-- SEO -->
-    <meta name="description" content="Find and book your perfect rental property with RentEase. Browse thousands of properties, message owners, and book instantly." />
-    <meta name="keywords" content="property rental, booking, apartments, houses, vacation rentals" />
-    <meta property="og:title" content="RentEase — Property Rental & Booking" />
-    <meta property="og:description" content="Find and book your perfect rental property." />
-    <meta property="og:type" content="website" />
+    <!-- Default SEO (overridden per-page by react-helmet-async) -->
+    <title>RentEase — Find &amp; Book Rental Properties in India</title>
+    <meta name="description" content="Find and book your perfect rental property with RentEase. Browse verified apartments, houses &amp; villas across India. Book instantly, pay advance rent online." />
+    <meta name="keywords" content="rental properties India, apartments for rent, book apartment online, rent house Bangalore, Mumbai flats, Delhi rental, PG accommodation" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://rentease.vercel.app/" />
+
+    <!-- Open Graph defaults -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:site_name"   content="RentEase" />
+    <meta property="og:title"       content="RentEase — Find &amp; Book Rental Properties in India" />
+    <meta property="og:description" content="Browse verified rental properties and book instantly on RentEase." />
+    <meta property="og:url"         content="https://rentease.vercel.app/" />
+    <meta property="og:image"       content="https://rentease.vercel.app/icons/icon-512x512.svg" />
+    <meta property="og:locale"      content="en_IN" />
+
+    <!-- Twitter Card defaults -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:site"        content="@RentEaseIndia" />
+    <meta name="twitter:title"       content="RentEase — Find &amp; Book Rental Properties in India" />
+    <meta name="twitter:description" content="Browse verified rental properties and book instantly on RentEase." />
+    <meta name="twitter:image"       content="https://rentease.vercel.app/icons/icon-512x512.svg" />
+
+    <!-- Geo targeting (India) -->
+    <meta name="geo.region"   content="IN" />
+    <meta name="geo.placename" content="India" />
+    <meta name="language"     content="English" />
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -28,8 +49,6 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-
-    <title>RentEase — Property Rental & Booking</title>
   </head>
   <body>
     <div id="root"></div>

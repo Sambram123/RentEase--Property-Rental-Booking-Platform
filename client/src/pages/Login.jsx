@@ -4,6 +4,7 @@ import { FiMail, FiLock, FiEye, FiEyeOff } from 'react-icons/fi';
 import { FcGoogle } from 'react-icons/fc';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import SEO from '../components/SEO';
 
 const Login = () => {
   const { login, loginWithGoogle } = useAuth();
@@ -58,6 +59,7 @@ const Login = () => {
 
   return (
     <div className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4 py-12">
+      <SEO title="Sign In" description="Sign in to your RentEase account to manage bookings, properties, and messages." canonical="/login" noIndex />
       {/* Header */}
       <div className="text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">

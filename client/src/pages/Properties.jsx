@@ -6,6 +6,7 @@ import PropertiesMapView from '../components/PropertiesMapView';
 import SearchBar from '../components/SearchBar';
 import FilterSidebar from '../components/FilterSidebar';
 import Loader from '../components/Loader';
+import SEO from '../components/SEO';
 import { fetchProperties } from '../services/propertyService';
 import { FEATURED_PROPERTIES } from '../utils/constants';
 import { saveSearch, trackSearch } from '../services/recommendationService';
@@ -166,8 +167,23 @@ const Properties = () => {
     setShowFilters(false);
   };
 
+  // ── Dynamic SEO ─────────────────────────────────────────────────────────────
+  const seoCity = query.city || '';
+  const seoType = query.type ? query.type.charAt(0).toUpperCase() + query.type.slice(1) : '';
+  const seoTitle = [seoType, seoCity ? `Rentals in ${seoCity}` : 'Rental Properties'].filter(Boolean).join(' ') || 'Browse Rental Properties';
+  const seoDesc  = seoCity
+    ? `Browse ${meta.total || ''} ${seoType.toLowerCase() || 'rental'} properties in ${seoCity}. Book instantly on RentEase.`
+    : `Browse ${meta.total || ''} verified rental properties across India. Filter by city, type, and budget.`;
+  const seoCanonical = `/properties${query.city ? `?city=${query.city}` : query.type ? `?type=${query.type}` : ''}`;
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <SEO
+        title={seoTitle}
+        description={seoDesc.slice(0, 160)}
+        canonical={seoCanonical}
+        keywords={`${seoCity} rentals, ${seoType.toLowerCase()} for rent, find rental property${seoCity ? ` ${seoCity}` : ''}`}
+      />
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

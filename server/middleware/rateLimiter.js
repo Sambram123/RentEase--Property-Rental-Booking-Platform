@@ -15,12 +15,12 @@ const rateLimitHandler = (req, res) => {
 // 1000 requests per 15 minutes per IP
 // ─────────────────────────────────────────────────────────────────────────────
 export const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 10 * 60 * 1000, // 10 minutes
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
-  message: 'Too many requests from this IP, please try again after 15 minutes.',
+  message: 'Too many requests from this IP, please try again after 10 minutes.',
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

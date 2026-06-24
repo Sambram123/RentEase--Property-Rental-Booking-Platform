@@ -1,0 +1,23 @@
+User-agent: *
+Allow: /
+Allow: /properties
+Allow: /properties/
+Allow: /login
+Allow: /register
+
+# Block authenticated/private pages from crawlers
+Disallow: /dashboard
+Disallow: /owner/dashboard
+Disallow: /admin
+Disallow: /my-bookings
+Disallow: /my-payments
+Disallow: /payment/
+Disallow: /settings
+Disallow: /notifications
+Disallow: /messages
+Disallow: /profile
+Disallow: /wishlist
+Disallow: /availability/
+
+# Sitemap location
+Sitemap: https://rentease.vercel.app/sitemap.xml

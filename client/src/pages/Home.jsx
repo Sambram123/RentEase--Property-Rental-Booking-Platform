@@ -7,6 +7,7 @@ import {
 import PropertyCard from '../components/PropertyCard';
 import LazyImage from '../components/LazyImage';
 import Loader from '../components/Loader';
+import SEO, { organizationSchema, websiteSchema } from '../components/SEO';
 import { healthCheck } from '../services/api';
 import { fetchTrending, fetchFeatured, fetchPopularCities } from '../services/recommendationService';
 import { trackSearch } from '../services/recommendationService';
@@ -118,6 +119,11 @@ const Home = () => {
 
   return (
     <>
+      <SEO
+        canonical="/"
+        structuredData={[organizationSchema, websiteSchema]}
+        keywords="rental properties, apartments for rent, rent house India, find rental property, book apartment online, Bangalore apartments, Mumbai flats, Delhi rental"
+      />
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-b from-rose-50/80 to-white px-4 pb-16 pt-12 sm:px-6 lg:px-8 lg:pb-24 lg:pt-20">
         <div className="mx-auto max-w-4xl text-center">
