@@ -141,6 +141,16 @@ const verifyPayment = asyncHandler(async (req, res) => {
     throw new Error('Not authorized to verify payment for this booking');
   }
 
+  // ── Idempotency guard: if already paid, return success without reprocessing ──
+  if (booking.paymentStatus === 'paid') {
+    const existingPayment = await Payment.findOne({ booking: bookingId, paymentStatus: 'success' });
+    return res.status(200).json({
+      success: true,
+      message: 'Payment already verified',
+      data: { payment: existingPayment, booking },
+    });
+  }
+
   const expectedSignature = crypto
     .createHmac('sha256', process.env.RAZORPAY_SECRET)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
