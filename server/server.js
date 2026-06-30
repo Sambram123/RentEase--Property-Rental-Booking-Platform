@@ -35,3 +35,20 @@ const startServer = async () => {
 };
 
 startServer();
+
+// ─── Process-level error guards ───────────────────────────────────────────────
+// Prevent silent crashes from unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️  Unhandled Promise Rejection:', reason);
+  // In production, log and let the process manager restart
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+});
+
+// Prevent crashes from unexpected synchronous errors
+process.on('uncaughtException', (error) => {
+  console.error('💥 Uncaught Exception:', error);
+  process.exit(1);
+});
+

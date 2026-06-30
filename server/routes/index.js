@@ -40,7 +40,11 @@ const registerRoutes = (app) => {
   app.use('/api/recommendations', recommendationRoutes);
   app.use('/api/searches', searchRoutes);
   app.use('/api/seo', seoRoutes);
-  app.use('/api/test', testRoutes);
+
+  // Only expose test/debug routes in non-production environments
+  if (process.env.NODE_ENV !== 'production') {
+    app.use('/api/test', testRoutes);
+  }
 };
 
 export default registerRoutes;

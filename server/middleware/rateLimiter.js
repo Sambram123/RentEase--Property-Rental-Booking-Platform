@@ -1,5 +1,8 @@
 import rateLimit from 'express-rate-limit';
 
+// Skip rate limiting in test environment to prevent false 429s during testing
+const skipInTest = () => process.env.NODE_ENV === 'test';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: standard JSON error response for rate limit hits
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,6 +24,7 @@ export const globalLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitHandler,
   message: 'Too many requests from this IP, please try again after 10 minutes.',
+  skip: skipInTest,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,6 +38,7 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitHandler,
   skipSuccessfulRequests: false,
+  skip: skipInTest,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,6 +51,7 @@ export const paymentLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
+  skip: skipInTest,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,6 +64,7 @@ export const messageLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
+  skip: skipInTest,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,6 +77,7 @@ export const uploadLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
+  skip: skipInTest,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,4 +90,6 @@ export const strictLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
+  skip: skipInTest,
 });
+
