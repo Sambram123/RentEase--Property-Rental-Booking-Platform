@@ -126,4 +126,18 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', 'react-hot-toast', 'axios'],
   },
+
+  test: {
+    // Vitest configuration — completely separate from Vite build
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.js'],
+    css: false,
+    // Exclude node_modules, dist, and E2E tests
+    exclude: ['node_modules', 'dist', 'dev-dist', '**/*.e2e.*', '**/*.spec.*'],
+    coverage: {
+      reporter: ['text', 'json', 'html'],
+      exclude: ['node_modules/', 'src/test/'],
+    },
+  },
 });

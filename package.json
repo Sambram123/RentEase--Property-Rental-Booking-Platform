@@ -7,12 +7,24 @@
     "client": "npm run dev --prefix client",
     "server": "npm run dev --prefix server",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "install:all": "npm install && npm install --prefix client && npm install --prefix server"
+    "install:all": "npm install && npm install --prefix client && npm install --prefix server",
+    "test": "npm run test:server && npm run test:client",
+    "test:server": "npm run test --prefix server",
+    "test:client": "npm run test --prefix client",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report"
   },
-  "keywords": ["rental", "booking", "mern", "property"],
+  "keywords": [
+    "rental",
+    "booking",
+    "mern",
+    "property"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "concurrently": "^9.1.2"
   }
 }
