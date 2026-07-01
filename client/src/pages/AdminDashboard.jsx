@@ -3,7 +3,8 @@ import {
   FiUsers, FiHome, FiCalendar, FiDollarSign, FiStar,
   FiBarChart2, FiSearch, FiTrash2, FiEdit, FiCheck,
   FiX, FiChevronLeft, FiChevronRight, FiShield, FiActivity,
-  FiRefreshCw, FiLock, FiAlertTriangle, FiEye,
+  FiRefreshCw, FiLock, FiAlertTriangle, FiEye, FiServer,
+  FiDatabase, FiWifi, FiArchive, FiCpu,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import {
@@ -20,6 +21,7 @@ import {
 } from '../services/adminService';
 import { fetchAdminRefunds, updateRefundStatus } from '../services/refundService';
 import { fetchSecurityDashboard, fetchAuditLogs } from '../services/securityService';
+import { fetchSystemMonitoring, triggerBackup } from '../services/systemService';
 import PerformanceDashboard from '../components/PerformanceDashboard';
 import { useAuth } from '../context/AuthContext';
 
@@ -42,6 +44,7 @@ const TAB_ITEMS = [
   { key: 'refunds',      label: 'Refunds',      icon: FiRefreshCw },
   { key: 'security',     label: 'Security',     icon: FiShield },
   { key: 'performance',  label: 'Performance',  icon: FiActivity },
+  { key: 'system',       label: 'System',       icon: FiServer },
 ];
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -129,6 +132,11 @@ const AdminDashboard = () => {
   const [auditActionFilter, setAuditActionFilter] = useState('');
   const [securityLoading, setSecurityLoading] = useState(false);
 
+  // System monitoring state
+  const [systemData, setSystemData] = useState(null);
+  const [systemLoading, setSystemLoading] = useState(false);
+  const [backupInProgress, setBackupInProgress] = useState(false);
+
   // ── Load dashboard ────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
@@ -202,6 +210,29 @@ const AdminDashboard = () => {
     } catch (err) { toast.error(err.message); }
   }, [auditActionFilter]);
 
+  const loadSystem = useCallback(async () => {
+    setSystemLoading(true);
+    try {
+      const data = await fetchSystemMonitoring();
+      setSystemData(data);
+    } catch (err) { toast.error(err.message || 'Failed to load system data'); }
+    finally { setSystemLoading(false); }
+  }, []);
+
+  const handleTriggerBackup = async () => {
+    setBackupInProgress(true);
+    try {
+      const result = await triggerBackup('manual');
+      if (result.success) {
+        toast.success('Backup completed successfully');
+      } else {
+        toast.error(`Backup skipped: ${result.error}`);
+      }
+      loadSystem();
+    } catch (err) { toast.error(err.message); }
+    finally { setBackupInProgress(false); }
+  };
+
   // ── Load on tab switch ─────────────────────────────────────────────────────
   useEffect(() => {
     if (tab === 'users') loadUsers();
@@ -211,7 +242,8 @@ const AdminDashboard = () => {
     else if (tab === 'reviews') loadReviews();
     else if (tab === 'refunds') loadRefunds();
     else if (tab === 'security') { loadSecurity(); loadAuditLogs(); }
-  }, [tab, loadUsers, loadProperties, loadBookings, loadPayments, loadReviews, loadRefunds, loadSecurity, loadAuditLogs]);
+    else if (tab === 'system') loadSystem();
+  }, [tab, loadUsers, loadProperties, loadBookings, loadPayments, loadReviews, loadRefunds, loadSecurity, loadAuditLogs, loadSystem]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const handleRoleChange = async (id, role) => {
@@ -1083,6 +1115,219 @@ const AdminDashboard = () => {
           {/* ═══════ PERFORMANCE ═══════ */}
           {tab === 'performance' && (
             <PerformanceDashboard token={token} />
+          )}
+
+          {/* ═══════ SYSTEM MONITORING ═══════ */}
+          {tab === 'system' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-secondary">System Monitoring</h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={loadSystem}
+                    disabled={systemLoading}
+                    className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-muted hover:bg-gray-50 transition"
+                  >
+                    <FiRefreshCw className={`h-3.5 w-3.5 ${systemLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </button>
+                  <button
+                    onClick={handleTriggerBackup}
+                    disabled={backupInProgress}
+                    className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-sm text-primary hover:bg-primary/20 transition"
+                  >
+                    <FiArchive className="h-3.5 w-3.5" />
+                    {backupInProgress ? 'Backing up…' : 'Trigger Backup'}
+                  </button>
+                </div>
+              </div>
+
+              {systemLoading && !systemData ? (
+                <div className="flex h-40 items-center justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                </div>
+              ) : systemData ? (
+                <>
+                  {/* Health Cards */}
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50">
+                          <FiServer className="h-4 w-4 text-emerald-500" />
+                        </span>
+                        <div>
+                          <p className="text-xs text-muted">Server</p>
+                          <p className="text-sm font-semibold capitalize text-emerald-600">{systemData.server?.status}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+                          systemData.database?.status === 'connected' ? 'bg-emerald-50' : 'bg-red-50'
+                        }`}>
+                          <FiDatabase className={`h-4 w-4 ${
+                            systemData.database?.status === 'connected' ? 'text-emerald-500' : 'text-red-500'
+                          }`} />
+                        </span>
+                        <div>
+                          <p className="text-xs text-muted">Database</p>
+                          <p className={`text-sm font-semibold capitalize ${
+                            systemData.database?.status === 'connected' ? 'text-emerald-600' : 'text-red-600'
+                          }`}>{systemData.database?.status}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
+                          <FiWifi className="h-4 w-4 text-blue-500" />
+                        </span>
+                        <div>
+                          <p className="text-xs text-muted">API</p>
+                          <p className="text-sm font-semibold capitalize text-blue-600">{systemData.api?.status}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50">
+                          <FiActivity className="h-4 w-4 text-purple-500" />
+                        </span>
+                        <div>
+                          <p className="text-xs text-muted">Uptime</p>
+                          <p className="text-sm font-semibold text-purple-600">{systemData.server?.uptimeFormatted}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Server & Memory Details */}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                      <div className="flex items-center gap-2 mb-4">
+                        <FiCpu className="h-4 w-4 text-primary" />
+                        <h3 className="text-sm font-semibold text-secondary">Memory Usage</h3>
+                      </div>
+                      <div className="space-y-3">
+                        {[['Heap Used', systemData.server?.memory?.heapUsedMB],
+                          ['Heap Total', systemData.server?.memory?.heapTotalMB],
+                          ['RSS', systemData.server?.memory?.rssMB]].map(([label, val]) => (
+                          <div key={label}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-muted">{label}</span>
+                              <span className="font-medium text-secondary">{val} MB</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-primary"
+                                style={{ width: `${Math.min((val / 512) * 100, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                      <div className="flex items-center gap-2 mb-4">
+                        <FiServer className="h-4 w-4 text-primary" />
+                        <h3 className="text-sm font-semibold text-secondary">Server Info</h3>
+                      </div>
+                      <dl className="space-y-2 text-sm">
+                        {[
+                          ['Environment', systemData.api?.environment],
+                          ['Version', systemData.api?.version],
+                          ['Node.js', systemData.server?.nodeVersion],
+                          ['Platform', systemData.server?.platform],
+                          ['DB Host', systemData.database?.host],
+                          ['DB Name', systemData.database?.name],
+                        ].map(([k, v]) => (
+                          <div key={k} className="flex justify-between">
+                            <dt className="text-muted">{k}</dt>
+                            <dd className="font-medium text-secondary truncate max-w-[160px]">{v || '—'}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  </div>
+
+                  {/* Error Summary */}
+                  <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <FiAlertTriangle className="h-4 w-4 text-amber-500" />
+                      <h3 className="text-sm font-semibold text-secondary">Error Summary</h3>
+                      <span className="ml-auto rounded-full bg-gray-100 px-2 py-0.5 text-xs text-muted">
+                        {systemData.errors?.total || 0} total
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {[
+                        { label: 'API Failures', val: systemData.errors?.apiFailures, color: 'red' },
+                        { label: 'Payment Failures', val: systemData.errors?.paymentFailures, color: 'orange' },
+                        { label: 'Auth Failures', val: systemData.errors?.authFailures, color: 'yellow' },
+                        { label: 'Email Failures', val: systemData.errors?.emailFailures, color: 'purple' },
+                      ].map(({ label, val, color }) => (
+                        <div key={label} className={`rounded-xl bg-${color}-50 p-3`}>
+                          <p className={`text-xs text-${color}-600`}>{label}</p>
+                          <p className={`text-2xl font-bold text-${color}-700 mt-0.5`}>{val || 0}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {systemData.errors?.recentErrors?.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-xs font-medium text-muted mb-2">Recent Errors</p>
+                        <div className="space-y-1.5">
+                          {systemData.errors.recentErrors.slice(0, 5).map((e) => (
+                            <div key={e.id} className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs">
+                              <FiAlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-red-500" />
+                              <div className="min-w-0">
+                                <span className="font-medium text-red-700">[{e.type}]</span>{' '}
+                                <span className="text-red-600 truncate">{e.route} — {e.message}</span>
+                              </div>
+                              <span className="ml-auto shrink-0 text-red-400">
+                                {new Date(e.timestamp).toLocaleTimeString('en-IN')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Backups */}
+                  <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <FiArchive className="h-4 w-4 text-primary" />
+                      <h3 className="text-sm font-semibold text-secondary">Backup Status</h3>
+                      <span className="ml-auto rounded-full bg-gray-100 px-2 py-0.5 text-xs text-muted">
+                        {systemData.backups?.count || 0} backups
+                      </span>
+                    </div>
+                    {systemData.backups?.recent?.length > 0 ? (
+                      <div className="space-y-2">
+                        {systemData.backups.recent.map((b, i) => (
+                          <div key={i} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                            <span className="font-mono text-xs text-secondary truncate max-w-[200px]">{b.name}</span>
+                            <span className="text-xs text-muted">
+                              {new Date(b.createdAt).toLocaleDateString('en-IN')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted text-center py-4">
+                        No backups yet. Click "Trigger Backup" to create one.
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-40 items-center justify-center text-muted">
+                  Click Refresh to load system data.
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

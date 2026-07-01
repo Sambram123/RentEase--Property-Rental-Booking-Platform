@@ -6,6 +6,7 @@ import xssFilters from 'xss-filters';
 import hpp from 'hpp';
 import { globalLimiter } from './rateLimiter.js';
 import performanceMiddleware from './performanceMiddleware.js';
+import logger from '../services/logger.js';
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,9 +144,10 @@ const applyMiddleware = (app) => {
   // ── Global rate limiter on all API routes ────────────────────────────────
   app.use('/api', globalLimiter);
 
-  // ── HTTP request logging ─────────────────────────────────────────────────
-  app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+  // ── HTTP request logging ───────────────────────────────────────────
+  const morganFormat = process.env.NODE_ENV === 'production' ? 'combined' : 'dev';
+  const morganStream = { write: (msg) => logger.info(msg.trim(), { source: 'http' }) };
+  app.use(morgan(morganFormat, { stream: morganStream }));
 };
 
 export default applyMiddleware;
-

@@ -22,6 +22,8 @@ server/dist/
 logs/
 *.log
 npm-debug.log*
+server/logs/
+server/backups/
 
 # OS
 .DS_Store

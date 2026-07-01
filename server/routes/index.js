@@ -15,14 +15,11 @@ import refundRoutes from './refundRoutes.js';
 import recommendationRoutes from './recommendationRoutes.js';
 import searchRoutes from './searchRoutes.js';
 import seoRoutes from './seoRoutes.js';
+import { healthCheck, statusCheck } from '../controllers/systemController.js';
 
 const registerRoutes = (app) => {
-  app.get('/api/health', (req, res) => {
-    res.status(200).json({
-      success: true,
-      message: 'RentEase API running',
-    });
-  });
+  app.get('/api/health', healthCheck);
+  app.get('/api/status', statusCheck);
 
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);

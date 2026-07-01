@@ -7,6 +7,7 @@ import applyMiddleware from './middleware/index.js';
 import registerRoutes from './routes/index.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 import { initializeSocket } from './socket/socketServer.js';
+import logger from './services/logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -29,26 +30,31 @@ const startServer = async () => {
   await connectDB();
 
   httpServer.listen(PORT, () => {
-    console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-    console.log(`🔌 Socket.IO ready on port ${PORT}`);
+    logger.info(`Server started`, {
+      mode: process.env.NODE_ENV || 'development',
+      port: PORT,
+    });
+    logger.info('Socket.IO ready', { port: PORT });
   });
 };
 
 startServer();
 
 // ─── Process-level error guards ───────────────────────────────────────────────
-// Prevent silent crashes from unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('⚠️  Unhandled Promise Rejection:', reason);
-  // In production, log and let the process manager restart
-  if (process.env.NODE_ENV === 'production') {
-    process.exit(1);
-  }
+process.on('unhandledRejection', (reason) => {
+  logger.critical('Unhandled Promise Rejection', { reason: String(reason) });
+  if (process.env.NODE_ENV === 'production') process.exit(1);
 });
 
-// Prevent crashes from unexpected synchronous errors
 process.on('uncaughtException', (error) => {
-  console.error('💥 Uncaught Exception:', error);
+  logger.critical('Uncaught Exception', { error: error.message, stack: error.stack });
   process.exit(1);
 });
 
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received — shutting down gracefully');
+  httpServer.close(() => {
+    logger.info('HTTP server closed');
+    process.exit(0);
+  });
+});

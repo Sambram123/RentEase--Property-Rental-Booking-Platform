@@ -111,11 +111,19 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-recharts': ['recharts'],
-          'vendor-icons': ['react-icons'],
-          'vendor-toast': ['react-hot-toast'],
+        manualChunks: (id) => {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/recharts')) {
+            return 'vendor-recharts';
+          }
+          if (id.includes('node_modules/react-icons')) {
+            return 'vendor-icons';
+          }
+          if (id.includes('node_modules/react-hot-toast')) {
+            return 'vendor-toast';
+          }
         },
       },
     },

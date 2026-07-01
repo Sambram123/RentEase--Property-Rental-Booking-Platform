@@ -1,3 +1,6 @@
+import logger from '../services/logger.js';
+import { trackError } from '../services/errorMonitor.js';
+
 const notFound = (req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
   res.status(404);
@@ -38,6 +41,17 @@ const errorHandler = (err, req, res, next) => {
     message = 'Not authorized — token has expired';
   }
 
+  // ── Centralized error tracking ────────────────────────────────────────────
+  if (statusCode >= 500) {
+    logger.error(message, {
+      route: req.originalUrl,
+      method: req.method,
+      statusCode,
+      stack: err.stack,
+    });
+    trackError('api', { route: req.originalUrl, message, meta: { statusCode } });
+  }
+
   // ── Strip stack trace in production ──────────────────────────────────────
   res.status(statusCode).json({
     success: false,
@@ -47,4 +61,3 @@ const errorHandler = (err, req, res, next) => {
 };
 
 export { notFound, errorHandler };
-

@@ -25,6 +25,7 @@ import {
   getFailedLogins,
 } from '../controllers/securityController.js';
 import { getPerformanceDashboard } from '../controllers/performanceController.js';
+import { getSystemMonitoring, triggerDatabaseBackup } from '../controllers/systemController.js';
 
 
 const router = Router();
@@ -68,6 +69,10 @@ router.get('/security/failed-logins', getFailedLogins);
 
 // ── Performance Monitoring (admin only) ──────────────────────────────────────
 router.get('/performance', getPerformanceDashboard);
+
+// ── System Monitoring (admin only) ───────────────────────────────────────────
+router.get('/system', getSystemMonitoring);
+router.post('/system/backup', triggerDatabaseBackup);
 
 export default router;
 
