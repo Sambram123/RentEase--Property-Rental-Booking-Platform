@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // File Upload Security Middleware
-// Validates MIME types and file sizes for multipart uploads
+// Validates MIME types and file sizes for image uploads (base64 data URIs)
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Allowed MIME types for property/avatar images
@@ -13,13 +13,12 @@ const ALLOWED_IMAGE_MIME_TYPES = [
 ];
 
 // Max sizes
-const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;   // 2 MB
+const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;         // 2 MB
 const MAX_PROPERTY_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 /**
- * Validate a base64 or URL image submission in request body.
- * This is used when images are sent as base64 strings (Cloudinary upload flow).
- * Checks estimated size to prevent oversized payloads.
+ * Validate a base64 image submission in request body.
+ * Checks MIME type and estimated byte size to prevent oversized payloads.
  *
  * @param {number} maxBytes - Maximum allowed size in bytes
  */
@@ -82,20 +81,3 @@ export const validateAvatarUpload = validateImagePayload(MAX_AVATAR_SIZE_BYTES);
  * Property image upload validator (5 MB per image limit)
  */
 export const validatePropertyImageUpload = validateImagePayload(MAX_PROPERTY_IMAGE_SIZE_BYTES);
-
-/**
- * Validate Cloudinary URL format (used when URL is stored in DB)
- * Prevents storing arbitrary external URLs as property images.
- */
-export const validateCloudinaryUrl = (url) => {
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.hostname === 'res.cloudinary.com' ||
-      parsed.hostname.endsWith('.cloudinary.com')
-    );
-  } catch {
-    return false;
-  }
-};

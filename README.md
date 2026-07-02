@@ -44,7 +44,7 @@ Browse, list, book and manage rental properties with real-time chat, payments, a
 
 ### Owner / Host
 - 🏠 **Property Management** — create, edit, publish/unpublish listings
-- 🖼️ **Cloudinary Uploads** — property photo and avatar management
+- 🖼️ **Photo Management** — upload property photos and avatar images
 - 📆 **Availability Calendar** — block-off dates, manage bookings
 - 💰 **Refund Management** — approve/deny refund requests
 - 📊 **Owner Dashboard** — revenue, occupancy stats
@@ -67,9 +67,7 @@ Browse, list, book and manage rental properties with real-time chat, payments, a
 | Database     | MongoDB Atlas, Mongoose 8                     |
 | Auth         | Firebase Auth + JWT                           |
 | Payments     | Razorpay                                      |
-| File Uploads | Cloudinary                                    |
 | Maps         | Google Maps API (`@react-google-maps/api`)    |
-| Email        | Nodemailer / SMTP                             |
 | Monitoring   | Winston logger, custom error monitor          |
 | Testing      | Vitest, Jest, Playwright (E2E)                |
 | Deployment   | Vercel (frontend), Render (backend)           |
@@ -97,18 +95,6 @@ CLIENT_URL=https://your-app.vercel.app
 # Razorpay
 RAZORPAY_KEY_ID=rzp_live_xxxx
 RAZORPAY_SECRET=your_razorpay_secret
-
-# Cloudinary
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
-
-# Email / SMTP
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your@email.com
-SMTP_PASS=your_app_password
-EMAIL_FROM=noreply@rentease.com
 ```
 
 ### Frontend (`client/.env`)
@@ -175,7 +161,7 @@ API runs on [http://localhost:5000](http://localhost:5000).
 1. Push this repo to GitHub.
 2. Go to [render.com](https://render.com) → **New Web Service** → Connect repo.
 3. Render auto-detects `render.yaml` — configure env vars in the dashboard.
-4. Set **MONGO_URI**, **JWT_SECRET**, **CLIENT_URL**, **RAZORPAY_\*** and optionally **CLOUDINARY_\*** and **SMTP_\*** in Render's Environment tab.
+4. Set **MONGO_URI**, **JWT_SECRET**, **CLIENT_URL**, **RAZORPAY_KEY_ID** and **RAZORPAY_SECRET** in Render's Environment tab.
 5. Deploy. Health check: `GET /api/health`
 
 ### Frontend → Vercel

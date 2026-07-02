@@ -95,7 +95,7 @@ const applyMiddleware = (app) => {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'", 'https://checkout.razorpay.com'],
           frameSrc: ["'self'", 'https://api.razorpay.com'],
-          imgSrc: ["'self'", 'data:', 'https://res.cloudinary.com', 'https://api.dicebear.com'],
+          imgSrc: ["'self'", 'data:', 'https://api.dicebear.com'],
           connectSrc: ["'self'", 'https://api.razorpay.com'],
         },
       },

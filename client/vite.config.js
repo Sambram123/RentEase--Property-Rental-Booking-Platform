@@ -81,14 +81,6 @@ export default defineConfig({
               networkTimeoutSeconds: 10,
             },
           },
-          {
-            urlPattern: /^https:\/\/res\.cloudinary\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'cloudinary-images-cache',
-              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
-            },
-          },
         ],
       },
       devOptions: {
