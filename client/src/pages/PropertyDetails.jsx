@@ -8,6 +8,7 @@ import {
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
+import ConfirmModal from '../components/ConfirmModal';
 import StarRating from '../components/StarRating';
 import SEO, { buildPropertySchema } from '../components/SEO';
 import { fetchPropertyById } from '../services/propertyService';
@@ -465,6 +466,7 @@ const ReviewSection = ({ propertyId, isAuthenticated, currentUserId }) => {
   const [editingId, setEditingId]       = useState(null);
   const [editRating, setEditRating]     = useState(0);
   const [editComment, setEditComment]   = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const loadReviews = useCallback(async () => {
     if (!propertyId || /^[0-9]+$/.test(propertyId)) return; // skip mock IDs
@@ -508,10 +510,10 @@ const ReviewSection = ({ propertyId, isAuthenticated, currentUserId }) => {
   };
 
   const handleDelete = async (reviewId) => {
-    if (!window.confirm('Delete your review?')) return;
     try {
       await deleteReview(reviewId);
       toast.success('Review deleted');
+      setConfirmDeleteId(null);
       await loadReviews();
     } catch (err) { toast.error(err.message); }
   };
@@ -520,6 +522,15 @@ const ReviewSection = ({ propertyId, isAuthenticated, currentUserId }) => {
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+      {/* Delete review confirm modal */}
+      <ConfirmModal
+        open={Boolean(confirmDeleteId)}
+        title="Delete review?"
+        message="This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => handleDelete(confirmDeleteId)}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
       {/* Header */}
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -592,8 +603,8 @@ const ReviewSection = ({ propertyId, isAuthenticated, currentUserId }) => {
                   <StarRating value={r.rating} size="sm" />
                   {r.user?._id === currentUserId && editingId !== r._id && (
                     <div className="flex gap-1">
-                      <button type="button" onClick={() => startEdit(r)} className="rounded p-1 text-muted transition hover:text-primary"><FiEdit2 className="h-3.5 w-3.5" /></button>
-                      <button type="button" onClick={() => handleDelete(r._id)} className="rounded p-1 text-muted transition hover:text-red-500"><FiTrash2 className="h-3.5 w-3.5" /></button>
+                      <button type="button" onClick={() => startEdit(r)} aria-label="Edit review" className="rounded p-1 text-muted transition hover:text-primary"><FiEdit2 className="h-3.5 w-3.5" /></button>
+                      <button type="button" onClick={() => setConfirmDeleteId(r._id)} aria-label="Delete review" className="rounded p-1 text-muted transition hover:text-red-500"><FiTrash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   )}
                 </div>
@@ -816,6 +827,7 @@ const PropertyDetails = () => {
                 <button
                   type="button"
                   onClick={handleShare}
+                  aria-label="Share this property"
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow transition hover:bg-white"
                 >
                   <FiShare2 className="h-4 w-4 text-secondary" />
@@ -828,11 +840,13 @@ const PropertyDetails = () => {
                   <button
                     key={idx}
                     onClick={() => setActiveImg(idx)}
+                    aria-label={`View image ${idx + 1} of ${images.length}`}
+                    aria-pressed={activeImg === idx}
                     className={`h-16 w-24 shrink-0 overflow-hidden rounded-xl border-2 transition ${
                       activeImg === idx ? 'border-primary' : 'border-transparent'
                     }`}
                   >
-                    <img src={img} alt="" className="h-full w-full object-cover"
+                    <img src={img} alt={`${property.title} — photo ${idx + 1}`} className="h-full w-full object-cover"
                       onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }} />
                   </button>
                 ))}

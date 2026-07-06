@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiMail, FiLock, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle } from 'react-icons/fi';
 import { FcGoogle } from 'react-icons/fc';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -11,11 +11,19 @@ const Login = () => {
   const navigate  = useNavigate();
   const location  = useLocation();
   const from      = location.state?.from?.pathname || '/dashboard';
+  const emailRef  = useRef(null);
+
+  const sessionExpired = new URLSearchParams(location.search).get('session') === 'expired';
 
   const [form, setForm]             = useState({ email: '', password: '' });
   const [showPassword, setShowPass] = useState(false);
   const [loading, setLoading]       = useState(false);
   const [googleLoading, setGoogleL] = useState(false);
+
+  // Auto-focus email on mount
+  useEffect(() => {
+    emailRef.current?.focus();
+  }, []);
 
   const handleChange = (e) =>
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -69,6 +77,14 @@ const Login = () => {
         <p className="mt-2 text-sm text-muted">Sign in to manage your bookings</p>
       </div>
 
+      {/* Session expired banner */}
+      {sessionExpired && (
+        <div className="mt-6 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+          <FiAlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+          <p className="text-amber-700">Your session expired. Please sign in again.</p>
+        </div>
+      )}
+
       {/* Google button */}
       <button
         type="button"
@@ -101,6 +117,7 @@ const Login = () => {
           <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
             <FiMail className="h-4 w-4 shrink-0 text-muted" />
             <input
+              ref={emailRef}
               id="login-email"
               name="email"
               type="email"
@@ -109,6 +126,7 @@ const Login = () => {
               placeholder="you@example.com"
               value={form.email}
               onChange={handleChange}
+              aria-describedby={sessionExpired ? 'session-expired-msg' : undefined}
               className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
             />
           </div>

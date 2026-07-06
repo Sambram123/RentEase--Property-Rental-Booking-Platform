@@ -26,10 +26,12 @@ api.interceptors.response.use(
     const message =
       error.response?.data?.message || error.message || 'Something went wrong';
 
-    // Auto-clear stale token on 401
+    // Auto-clear stale token on 401 and notify app to redirect to login
     if (error.response?.status === 401) {
       localStorage.removeItem('rentease_token');
       localStorage.removeItem('rentease_user');
+      // Dispatch event so AuthContext can handle redirect without circular import
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     }
 
     return Promise.reject(new Error(message));

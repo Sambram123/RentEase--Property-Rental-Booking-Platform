@@ -70,6 +70,22 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
+  // ── Listen for 401 Unauthorized from API interceptor ──────────────────────
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearSession();
+      setUser(null);
+      setToken(null);
+      // Redirect to login preserving current path for post-login return
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        window.location.href = `/login?session=expired`;
+      }
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
+
   // ─── Auth actions ──────────────────────────────────────────────────────────
 
   /**

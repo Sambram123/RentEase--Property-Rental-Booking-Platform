@@ -2,13 +2,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   FiSearch, FiMapPin, FiTrendingUp, FiStar,
-  FiHome, FiArrowRight, FiClock,
+  FiHome, FiArrowRight,
 } from 'react-icons/fi';
 import PropertyCard from '../components/PropertyCard';
 import LazyImage from '../components/LazyImage';
 import Loader from '../components/Loader';
 import SEO, { organizationSchema, websiteSchema } from '../components/SEO';
-import { healthCheck } from '../services/api';
 import { fetchTrending, fetchFeatured, fetchPopularCities } from '../services/recommendationService';
 import { trackSearch } from '../services/recommendationService';
 import { useAuth } from '../context/AuthContext';
@@ -64,7 +63,6 @@ const PropertyMiniCard = ({ property }) => {
 const Home = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const [apiStatus,    setApiStatus]    = useState({ loading: true, data: null, error: null });
   const [trending,     setTrending]     = useState([]);
   const [featured,     setFeatured]     = useState([]);
   const [popularCities, setPopularCities] = useState([]);
@@ -73,13 +71,6 @@ const Home = () => {
   // Search state
   const [searchCity, setSearchCity] = useState('');
   const [searchType, setSearchType] = useState('');
-
-  // Load API health
-  useEffect(() => {
-    healthCheck()
-      .then((data) => setApiStatus({ loading: false, data, error: null }))
-      .catch((err) => setApiStatus({ loading: false, data: null, error: err.message }));
-  }, []);
 
   // Load discovery data
   useEffect(() => {
@@ -151,6 +142,7 @@ const Home = () => {
                   onChange={(e) => setSearchCity(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="City — Bangalore, Mumbai…"
+                  aria-label="Search by city"
                   className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
                 />
               </div>
@@ -160,6 +152,7 @@ const Home = () => {
                   id="hero-type-select"
                   value={searchType}
                   onChange={(e) => setSearchType(e.target.value)}
+                  aria-label="Property type"
                   className="w-full bg-transparent text-sm text-secondary outline-none"
                 >
                   <option value="">All types</option>
@@ -180,25 +173,6 @@ const Home = () => {
                 Search
               </button>
             </div>
-          </div>
-
-          {/* API status pill */}
-          <div className="mt-6 flex justify-center">
-            {apiStatus.loading ? (
-              <span className="flex items-center gap-2 text-sm text-muted">
-                <Loader size="sm" /> Checking API…
-              </span>
-            ) : apiStatus.data ? (
-              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700 ring-1 ring-emerald-100">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Backend: {apiStatus.data.message}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-1.5 text-sm font-medium text-red-700 ring-1 ring-red-100">
-                <span className="h-2 w-2 rounded-full bg-red-500" />
-                Backend offline: {apiStatus.error}
-              </span>
-            )}
           </div>
         </div>
       </section>
