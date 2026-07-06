@@ -20,119 +20,57 @@ class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // Log to console for debugging; replace with Sentry / logging service in production
-    console.error('[ErrorBoundary] Caught a rendering error:', error, info.componentStack);
+    // In production, replace this with your monitoring service (e.g. Sentry)
+    if (import.meta.env.DEV) {
+      console.error('[ErrorBoundary] Rendering error:', error, info.componentStack);
+    }
   }
 
   handleReset = () => {
     this.setState({ hasError: false, error: null });
-    // Navigate to home as a recovery action
     window.location.href = '/';
   };
 
   render() {
     if (this.state.hasError) {
       return (
-        <div
-          style={{
-            minHeight: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '2rem',
-            background: 'linear-gradient(135deg, #fff5f5 0%, #fff 100%)',
-            textAlign: 'center',
-            fontFamily: 'Inter, system-ui, sans-serif',
-          }}
-        >
+        <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-rose-50 to-white px-6 text-center">
           {/* Illustration */}
-          <div
-            style={{
-              fontSize: '4rem',
-              marginBottom: '1.5rem',
-              lineHeight: 1,
-            }}
-          >
-            😞
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-primary/10">
+            <span className="text-4xl" role="img" aria-label="Error">😞</span>
           </div>
 
-          <h1
-            style={{
-              fontSize: '1.5rem',
-              fontWeight: 700,
-              color: '#1a1a2e',
-              marginBottom: '0.75rem',
-            }}
-          >
-            Something went wrong
-          </h1>
+          <h1 className="text-2xl font-bold text-secondary">Something went wrong</h1>
 
-          <p
-            style={{
-              color: '#6b7280',
-              fontSize: '1rem',
-              maxWidth: '400px',
-              lineHeight: 1.6,
-              marginBottom: '2rem',
-            }}
-          >
-            We ran into an unexpected issue. Your data is safe. Please try
+          <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted">
+            We ran into an unexpected issue. Your data is safe — please try
             refreshing the page or going back to the home screen.
           </p>
 
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <button
+              type="button"
               onClick={() => window.location.reload()}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: '#ff385c',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '0.75rem',
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-              }}
+              className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
-              Refresh Page
+              Refresh page
             </button>
             <button
+              type="button"
               onClick={this.handleReset}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'transparent',
-                color: '#374151',
-                border: '2px solid #e5e7eb',
-                borderRadius: '0.75rem',
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-              }}
+              className="rounded-xl border border-gray-200 bg-white px-6 py-2.5 text-sm font-semibold text-secondary transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
-              Go to Home
+              Go to home
             </button>
           </div>
 
-          {/* Show error details in development */}
+          {/* Error details — dev only */}
           {import.meta.env.DEV && this.state.error && (
-            <details
-              style={{
-                marginTop: '2rem',
-                textAlign: 'left',
-                maxWidth: '600px',
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: '0.5rem',
-                padding: '1rem',
-                fontSize: '0.75rem',
-                color: '#dc2626',
-              }}
-            >
-              <summary style={{ cursor: 'pointer', fontWeight: 600, marginBottom: '0.5rem' }}>
+            <details className="mt-8 w-full max-w-xl rounded-xl border border-red-200 bg-red-50 p-4 text-left">
+              <summary className="cursor-pointer text-xs font-semibold text-red-600">
                 Error details (dev only)
               </summary>
-              <pre style={{ overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+              <pre className="mt-2 overflow-auto whitespace-pre-wrap text-xs text-red-700">
                 {this.state.error.toString()}
               </pre>
             </details>

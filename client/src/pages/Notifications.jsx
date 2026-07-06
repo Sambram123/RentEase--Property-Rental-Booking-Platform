@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   FiBell, FiCheck, FiCheckCircle, FiTrash2, FiChevronLeft,
-  FiChevronRight, FiInbox, FiFilter,
+  FiChevronRight, FiInbox,
 } from 'react-icons/fi';
 import { MdNotificationsActive } from 'react-icons/md';
 import toast from 'react-hot-toast';
@@ -13,21 +13,8 @@ import {
 } from '../services/notificationService';
 import { useNotifications, getNotifConfig } from '../context/NotificationContext';
 import { usePushNotifications } from '../hooks/usePushNotifications';
-import Loader from '../components/Loader';
-
-const fmtTime = (d) => {
-  const now = new Date();
-  const date = new Date(d);
-  const diff = now - date;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-};
+import { NotificationSkeleton } from '../components/SkeletonLoaders';
+import { formatTimeAgo } from '../utils/constants';
 
 const TYPE_COLORS = {
   booking_created:   'bg-blue-500/10 text-blue-500 border-blue-500/20',
@@ -210,8 +197,8 @@ const Notifications = () => {
 
       {/* ── Notification list ──────────────────────────────────────── */}
       {loading ? (
-        <div className="flex h-60 items-center justify-center">
-          <Loader />
+        <div role="status" aria-label="Loading notifications">
+          <NotificationSkeleton count={6} />
         </div>
       ) : notifications.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 py-20 text-center">
@@ -246,7 +233,7 @@ const Notifications = () => {
                     <p className={`text-sm font-semibold ${notif.isRead ? 'text-secondary' : 'text-secondary'}`}>
                       {notif.title}
                     </p>
-                    <span className="shrink-0 text-xs text-muted">{fmtTime(notif.createdAt)}</span>
+                    <span className="shrink-0 text-xs text-muted">{formatTimeAgo(notif.createdAt)}</span>
                   </div>
                   <p className="mt-0.5 text-sm text-muted line-clamp-2">{notif.message}</p>
                   {notif.sender && (

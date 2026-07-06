@@ -8,23 +8,11 @@ import { getUserAvatar } from '../utils/avatar';
 import { useNotifications, getNotifConfig } from '../context/NotificationContext';
 import { markNotificationRead } from '../services/notificationService';
 import { useChat } from '../context/ChatContext';
+import { formatTimeAgo } from '../utils/constants';
 
 const navLinks = [
   { to: '/properties', label: 'Properties' },
 ];
-
-const fmtTime = (d) => {
-  const now = new Date();
-  const date = new Date(d);
-  const diff = now - date;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d`;
-};
 
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -37,7 +25,7 @@ const Navbar = () => {
   const bellRef = useRef(null);
   const profileRef = useRef(null);
 
-  // Close dropdowns on outside click
+  // Close dropdowns on outside click OR Escape key
   useEffect(() => {
     const handleClick = (e) => {
       if (bellRef.current && !bellRef.current.contains(e.target)) {
@@ -47,8 +35,18 @@ const Navbar = () => {
         setProfileOpen(false);
       }
     };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setBellOpen(false);
+        setProfileOpen(false);
+      }
+    };
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const linkClass = ({ isActive }) =>
@@ -142,6 +140,8 @@ const Navbar = () => {
                   onClick={() => setBellOpen(!bellOpen)}
                   className="relative flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-gray-100"
                   aria-label="Notifications"
+                  aria-expanded={bellOpen}
+                  aria-haspopup="true"
                   id="notification-bell"
                 >
                   <FiBell className="h-5 w-5 text-secondary" />
@@ -190,7 +190,7 @@ const Navbar = () => {
                                 <p className="text-xs text-muted line-clamp-1">{notif.message}</p>
                               </div>
                               <span className="shrink-0 text-[10px] text-muted">
-                                {fmtTime(notif.createdAt)}
+                                {formatTimeAgo(notif.createdAt)}
                               </span>
                               {!notif.isRead && (
                                 <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />
@@ -218,6 +218,9 @@ const Navbar = () => {
                   type="button"
                   onClick={() => setProfileOpen(!profileOpen)}
                   className="flex items-center gap-2 rounded-full px-3 py-1.5 transition hover:bg-gray-50"
+                  aria-label="Profile menu"
+                  aria-expanded={profileOpen}
+                  aria-haspopup="true"
                 >
                   <img
                     src={avatarUrl}
