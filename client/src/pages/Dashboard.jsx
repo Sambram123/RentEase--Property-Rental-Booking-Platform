@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { fetchTenantDashboard } from '../services/dashboardService';
 import { getProfile } from '../services/userService';
 import ProfileCard from '../components/ProfileCard';
-import { formatPrice } from '../utils/constants';
+import { formatPrice, formatTimeAgo } from '../utils/constants';
 import ActivityFeed from '../components/ActivityFeed';
 import { useChat } from '../context/ChatContext';
 import { getUserAvatar } from '../utils/avatar';
@@ -80,20 +80,6 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 const fmtDate = (d) =>
   new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-
-const fmtTime = (d) => {
-  const now = new Date();
-  const date = new Date(d);
-  const diff = now - date;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-};
 
 // ─── Tenant Dashboard ────────────────────────────────────────────────────────
 const Dashboard = () => {
@@ -411,7 +397,7 @@ const Dashboard = () => {
                           {otherParticipant?.name || 'User'}
                         </p>
                         <span className="text-[10px] text-muted">
-                          {conv.lastMessageAt ? fmtTime(conv.lastMessageAt) : ''}
+                          {conv.lastMessageAt ? formatTimeAgo(conv.lastMessageAt) : ''}
                         </span>
                       </div>
                       <p className="truncate text-xs font-medium text-primary">
