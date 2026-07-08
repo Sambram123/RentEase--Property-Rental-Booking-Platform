@@ -42,5 +42,6 @@ coverage/
 *.pem
 .cache/
 
-#docs
-docs/
+# Playwright test artefacts (large videos/traces)
+test-results/
+playwright-report/

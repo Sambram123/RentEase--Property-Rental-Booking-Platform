@@ -13,7 +13,10 @@
     "test:client": "npm run test --prefix client",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "seed:users": "node server/utils/seedDb.js",
+    "seed:demo": "node server/utils/seedDemoData.js",
+    "seed": "node server/utils/seedDb.js && node server/utils/seedDemoData.js"
   },
   "keywords": [
     "rental",
