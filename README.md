@@ -17,7 +17,7 @@
 
 <h1>RentEase — Property Rental & Booking Platform</h1>
 
-**A production-grade, full-stack Airbnb-style rental platform built in 30 days with the MERN stack.**
+**A production-grade, full-stack Airbnb-style rental platform built with the MERN stack.**
 Browse, list, book and manage rental properties with real-time chat, Razorpay payments, AI-powered recommendations, analytics dashboards, PWA support, and a full admin panel.
 
 [🚀 Live Demo](#-live-deployment) · [📖 Docs](docs/) · [🏗 Architecture](#-architecture) · [🎯 Features](#-features) · [⚙️ Setup](#-local-setup)
