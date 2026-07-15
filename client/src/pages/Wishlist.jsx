@@ -7,6 +7,7 @@ import LazyImage from '../components/LazyImage';
 import { PropertyGridSkeleton } from '../components/SkeletonLoaders';
 import { fetchWishlist, removeFromWishlist } from '../services/wishlistService';
 import { formatPrice } from '../utils/constants';
+import { getFirstImageUrl } from '../utils/imageUtils';
 
 const PLACEHOLDER =
   'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80';
@@ -85,8 +86,7 @@ const Wishlist = () => {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {properties.map((property) => {
-            const image =
-              (Array.isArray(property.images) && property.images[0]) || PLACEHOLDER;
+            const image = getFirstImageUrl(property.images, PLACEHOLDER);
             const location =
               property.city || property.address?.city || '';
 

@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import { getFirstImageUrl, getImageUrls } from '../utils/imageUtils';
 
 const SITE_NAME    = 'RentEase';
 const SITE_URL     = 'https://rentease.vercel.app'; // canonical base URL
@@ -34,8 +35,13 @@ const SEO = ({
   const keywordsStr  = Array.isArray(keywords) ? keywords.join(', ') : keywords;
   const desc         = description.slice(0, 160);
 
+  // Ensure ogImage is a string URL (guards against receiving an image object like {url, public_id})
+  const ogImageStr = typeof ogImage === 'string'
+    ? ogImage
+    : (typeof ogImage === 'object' && ogImage?.url ? ogImage.url : DEFAULT_IMG);
+
   // Ensure OG image is absolute
-  const absOgImage = ogImage?.startsWith('http') ? ogImage : `${SITE_URL}${ogImage}`;
+  const absOgImage = ogImageStr.startsWith('http') ? ogImageStr : `${SITE_URL}${ogImageStr}`;
 
   return (
     <Helmet>
@@ -116,9 +122,8 @@ export const buildPropertySchema = (property) => {
   if (!property) return null;
   const city  = property.city || property.address?.city || '';
   const state = property.address?.state || '';
-  const image = Array.isArray(property.images) && property.images[0]
-    ? property.images[0]
-    : `${SITE_URL}/icons/icon-512x512.svg`;
+  const image = getFirstImageUrl(property.images, `${SITE_URL}/icons/icon-512x512.svg`);
+  const allImageUrls = getImageUrls(property.images);
 
   return {
     '@context': 'https://schema.org',
@@ -126,7 +131,7 @@ export const buildPropertySchema = (property) => {
     name: property.title,
     description: property.description || `${property.type} available for rent in ${city}`,
     url: `${SITE_URL}/properties/${property._id}`,
-    image: Array.isArray(property.images) ? property.images : [image],
+    image: allImageUrls.length ? allImageUrls : [image],
     address: {
       '@type': 'PostalAddress',
       addressLocality: city,

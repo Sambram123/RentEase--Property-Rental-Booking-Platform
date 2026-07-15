@@ -48,10 +48,18 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Better focus styles for accessibility */
-:focus-visible {
+/* Better focus styles for accessibility — EXCLUDES inputs (they use parent focus-within ring) */
+:focus-visible:not(input):not(textarea):not(select) {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+/* Suppress native browser outline / password-manager border on all inputs */
+input,
+textarea,
+select {
+  outline: none !important;
+  box-shadow: none;
 }
 
 /* Smooth image rendering */

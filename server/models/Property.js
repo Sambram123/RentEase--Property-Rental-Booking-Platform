@@ -89,7 +89,13 @@ const propertySchema = new mongoose.Schema(
     },
 
     images: {
-      type: [String], // array of image URL strings
+      type: [
+        {
+          url:       { type: String, required: true },
+          public_id: { type: String, default: '' },  // optional — legacy docs may not have this
+          _id:       false,
+        },
+      ],
       default: [],
     },
 

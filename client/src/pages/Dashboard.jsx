@@ -18,6 +18,7 @@ import { formatPrice, formatTimeAgo } from '../utils/constants';
 import ActivityFeed from '../components/ActivityFeed';
 import { useChat } from '../context/ChatContext';
 import { getUserAvatar } from '../utils/avatar';
+import { getFirstImageUrl } from '../utils/imageUtils';
 import RecentlyViewed from '../components/RecentlyViewed';
 import { fetchRecommendations, fetchSavedSearches, deleteSavedSearch } from '../services/recommendationService';
 
@@ -270,7 +271,7 @@ const Dashboard = () => {
             <div className="space-y-3">
               {recentBookings.map((bk) => {
                 const prop = bk.property || {};
-                const img = (Array.isArray(prop.images) && prop.images[0]) || PLACEHOLDER;
+                const img = getFirstImageUrl(prop.images, PLACEHOLDER);
                 return (
                   <div key={bk._id} className="flex items-center gap-4 rounded-xl border border-gray-50 bg-gray-50/30 p-3 transition hover:bg-gray-50">
                     <img
@@ -497,7 +498,7 @@ const Dashboard = () => {
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {recommendations.slice(0, 6).map((p) => {
-              const img  = (Array.isArray(p.images) && p.images[0]) || PLACEHOLDER;
+              const img  = getFirstImageUrl(p.images, PLACEHOLDER);
               const city = p.city || p.address?.city || '';
               return (
                 <Link

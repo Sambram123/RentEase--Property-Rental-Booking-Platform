@@ -30,17 +30,11 @@ Browse, list, book and manage rental properties with real-time chat, Razorpay pa
 
 | Service  | URL                                              | Status |
 |----------|--------------------------------------------------|--------|
-| Frontend | _Deploy to Vercel → update this URL_             | [![Vercel](https://img.shields.io/badge/Vercel-deployed-black?logo=vercel)](https://vercel.com) |
-| Backend  | _Deploy to Render → update this URL_             | [![Render](https://img.shields.io/badge/Render-deployed-46E3B7?logo=render)](https://render.com) |
-| Database | MongoDB Atlas (production cluster)               | ![MongoDB](https://img.shields.io/badge/Atlas-connected-47A248?logo=mongodb) |
+| Frontend | https://rent-ease-property-rental-booking-p.vercel.app/            | [![Vercel](https://img.shields.io/badge/Vercel-deployed-black?logo=vercel)](https://vercel.com) |
+| Backend  | https://rentease-property-rental-booking-platform.onrender.com/            | [![Render](https://img.shields.io/badge/Render-deployed-46E3B7?logo=render)](https://render.com) |
+
 
 > **Demo Accounts** (seed with `node server/utils/seedDb.js` then `node server/utils/seedDemoData.js`):
->
-> | Role   | Email                   | Password      |
-> |--------|-------------------------|---------------|
-> | Admin  | admin@rentease.com      | `Admin@123!`  |
-> | Owner  | owner@rentease.com      | `Owner@123!`  |
-> | Tenant | tenant@rentease.com     | `Tenant@123!` |
 
 ---
 
@@ -522,7 +516,7 @@ MIT © 2026 RentEase
 
 <div align="center">
 
-Built with ❤️ using the **MERN Stack** · 30 days · Production deployed
+Built with ❤️ using the **MERN Stack** · Production deployed
 
 ⭐ **Star this repo if you found it helpful!** ⭐
 

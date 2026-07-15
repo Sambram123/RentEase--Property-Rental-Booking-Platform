@@ -6,6 +6,7 @@ import {
   getOwnerProperties,
   updateProperty,
   deleteProperty,
+  deletePropertyImage,
 } from '../controllers/propertyController.js';
 import {
   getTrending,
@@ -17,6 +18,7 @@ import {
   trackSearchAction,
 } from '../controllers/recommendationController.js';
 import { protect, ownerOnly } from '../middleware/authMiddleware.js';
+import upload, { validateImageBuffers } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -40,14 +42,28 @@ router.post('/track-search', protect, trackSearchAction);
 router
   .route('/')
   .get(getProperties)
-  .post(protect, ownerOnly, createProperty);
+  .post(
+    protect,
+    ownerOnly,
+    upload.array('images', 10),
+    validateImageBuffers,
+    createProperty
+  );
 
 // ── Single property + sub-routes ──────────────────────────────────────────────
 router
   .route('/:id')
   .get(getSingleProperty)
-  .put(protect, updateProperty)
+  .put(
+    protect,
+    upload.array('images', 10),
+    validateImageBuffers,
+    updateProperty
+  )
   .delete(protect, deleteProperty);
+
+// Delete a single image from a property
+router.delete('/:id/images/:public_id', protect, deletePropertyImage);
 
 // Similar properties
 router.get('/:id/similar', getSimilar);

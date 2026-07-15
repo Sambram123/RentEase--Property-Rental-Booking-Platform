@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
 import { fetchMyPayments } from '../services/paymentService';
 import { formatPrice } from '../utils/constants';
+import { getFirstImageUrl } from '../utils/imageUtils';
 
 const PLACEHOLDER =
   'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
@@ -30,7 +31,7 @@ const PaymentCard = ({ payment }) => {
   const booking = payment.booking  || {};
   const cfg     = STATUS_CONFIG[payment.paymentStatus] || STATUS_CONFIG.pending;
   const Icon    = cfg.icon;
-  const image   = (Array.isArray(prop.images) && prop.images[0]) || PLACEHOLDER;
+  const image   = getFirstImageUrl(prop.images, PLACEHOLDER);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">

@@ -6,6 +6,7 @@ import {
   geoJsonToLatLng,
 } from '../services/mapsService';
 import { formatPrice } from '../utils/constants';
+import { getFirstImageUrl } from '../utils/imageUtils';
 
 const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
 const MAP_OPTIONS = {
@@ -96,7 +97,7 @@ const PropertiesMapView = ({ properties = [], className = 'h-[520px] w-full' }) 
 
         {activeProperty && (() => {
           const coords = geoJsonToLatLng(activeProperty.location.coordinates);
-          const img = (Array.isArray(activeProperty.images) && activeProperty.images[0]) || PLACEHOLDER;
+          const img = getFirstImageUrl(activeProperty.images, PLACEHOLDER);
           const id  = activeProperty._id || activeProperty.id;
           return (
             <InfoWindow

@@ -13,6 +13,7 @@ import { createPaymentOrder, verifyPayment } from '../services/paymentService';
 import { openRazorpayCheckout } from '../utils/razorpayCheckout';
 import { useAuth } from '../context/AuthContext';
 import { formatPrice } from '../utils/constants';
+import { getFirstImageUrl } from '../utils/imageUtils';
 
 const PLACEHOLDER =
   'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
@@ -234,7 +235,7 @@ const RefundCard = ({ refund }) => {
 // ─── BookingCard ──────────────────────────────────────────────────────────────
 const BookingCard = ({ booking, refundsMap, onCancelClick, onPay, paying }) => {
   const prop   = booking.property || {};
-  const image  = (Array.isArray(prop.images) && prop.images[0]) || PLACEHOLDER;
+  const image  = getFirstImageUrl(prop.images, PLACEHOLDER);
   const city   = prop.city || prop.address?.city || '';
   const nights = diffDays(booking.checkInDate, booking.checkOutDate);
   const refund = refundsMap[booking._id];

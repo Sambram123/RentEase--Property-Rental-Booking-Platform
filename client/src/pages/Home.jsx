@@ -12,6 +12,7 @@ import { fetchTrending, fetchFeatured, fetchPopularCities } from '../services/re
 import { trackSearch } from '../services/recommendationService';
 import { useAuth } from '../context/AuthContext';
 import { formatPrice } from '../utils/constants';
+import { getFirstImageUrl } from '../utils/imageUtils';
 
 const PLACEHOLDER = 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
 
@@ -19,7 +20,7 @@ const CITY_EMOJIS = { Delhi: '🏛️', Mumbai: '🌊', Bangalore: '🌿', Chenn
 
 // ─── Minimal PropertyMiniCard for trending/featured ───────────────────────────
 const PropertyMiniCard = ({ property }) => {
-  const img  = (Array.isArray(property.images) && property.images[0]) || PLACEHOLDER;
+  const img  = getFirstImageUrl(property.images, PLACEHOLDER);
   const city = property.city || property.address?.city || '';
   return (
     <Link

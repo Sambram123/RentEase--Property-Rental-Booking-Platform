@@ -8,6 +8,7 @@ import {
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
+import ImageCarousel from '../components/ImageCarousel';
 import ConfirmModal from '../components/ConfirmModal';
 import StarRating from '../components/StarRating';
 import SEO, { buildPropertySchema } from '../components/SEO';
@@ -24,6 +25,7 @@ import { formatPrice, FEATURED_PROPERTIES } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 import { createConversation } from '../services/messageService';
 import { trackPropertyView, fetchSimilarProperties } from '../services/recommendationService';
+import { getFirstImageUrl } from '../utils/imageUtils';
 
 const AMENITY_ICONS = {
   wifi:         { icon: '📶', label: 'WiFi' },
@@ -645,7 +647,6 @@ const PropertyDetails = () => {
   const [error,     setError]     = useState('');
   const [wishlisted, setWishlisted] = useState(false);
   const [wishLoading, setWishLoading] = useState(false);
-  const [activeImg, setActiveImg] = useState(0);
   const [similarProperties, setSimilarProperties] = useState([]);
 
   useEffect(() => {
@@ -757,7 +758,9 @@ const PropertyDetails = () => {
     );
   }
 
-  const images    = property.images?.length ? property.images : [PLACEHOLDER_IMAGE];
+  // Normalise images: support [{url,public_id}] objects AND legacy strings
+  const rawImages = property.images?.length ? property.images : [];
+  const images    = rawImages.length ? rawImages : [PLACEHOLDER_IMAGE];
   const address   = property.address || {};
   const cityLabel = property.city || address.city || '';
   const fullAddr  = [address.street, address.city, address.state, address.country]
@@ -768,7 +771,7 @@ const PropertyDetails = () => {
   const seoDesc   = property.description
     ? property.description.slice(0, 155)
     : `${property.type ? property.type.charAt(0).toUpperCase() + property.type.slice(1) : 'Property'} for rent in ${cityLabel}. ${formatPrice(property.price ?? 0)}/month. Book instantly on RentEase.`;
-  const seoImage  = images[0] || PLACEHOLDER_IMAGE;
+  const seoImage  = getFirstImageUrl(images, PLACEHOLDER_IMAGE);
   const seoKeywords = [
     property.type ? `${property.type} for rent` : '',
     cityLabel ? `rental properties ${cityLabel}` : '',
@@ -801,56 +804,32 @@ const PropertyDetails = () => {
         <div className="space-y-6">
 
           {/* Gallery */}
-          <div>
-            <div className="relative aspect-[16/9] overflow-hidden rounded-2xl shadow-md">
-              <img
-                src={images[activeImg]}
-                alt={property.title}
-                className="h-full w-full object-cover"
-                onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }}
-              />
-              {!property.availability && (
-                <span className="absolute left-4 top-4 rounded-full bg-gray-800/80 px-3 py-1 text-xs font-semibold text-white">
-                  Currently unavailable
-                </span>
-              )}
-              <div className="absolute right-4 top-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={toggleWishlist}
-                  disabled={wishLoading}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow transition hover:bg-white disabled:opacity-50"
-                  aria-label={wishlisted ? 'Remove from wishlist' : 'Save to wishlist'}
-                >
-                  <FiHeart className={`h-4 w-4 transition ${wishlisted ? 'fill-primary text-primary' : 'text-secondary'}`} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleShare}
-                  aria-label="Share this property"
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow transition hover:bg-white"
-                >
-                  <FiShare2 className="h-4 w-4 text-secondary" />
-                </button>
-              </div>
+          <div className="relative">
+            <ImageCarousel images={images} title={property.title} />
+            {/* Wishlist & Share overlay buttons */}
+            <div className="absolute right-3 top-3 z-30 flex gap-2">
+              <button
+                type="button"
+                onClick={toggleWishlist}
+                disabled={wishLoading}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow transition hover:bg-white disabled:opacity-50"
+                aria-label={wishlisted ? 'Remove from wishlist' : 'Save to wishlist'}
+              >
+                <FiHeart className={`h-4 w-4 transition ${wishlisted ? 'fill-primary text-primary' : 'text-secondary'}`} />
+              </button>
+              <button
+                type="button"
+                onClick={handleShare}
+                aria-label="Share this property"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow transition hover:bg-white"
+              >
+                <FiShare2 className="h-4 w-4 text-secondary" />
+              </button>
             </div>
-            {images.length > 1 && (
-              <div className="mt-3 flex gap-2 overflow-x-auto">
-                {images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveImg(idx)}
-                    aria-label={`View image ${idx + 1} of ${images.length}`}
-                    aria-pressed={activeImg === idx}
-                    className={`h-16 w-24 shrink-0 overflow-hidden rounded-xl border-2 transition ${
-                      activeImg === idx ? 'border-primary' : 'border-transparent'
-                    }`}
-                  >
-                    <img src={img} alt={`${property.title} — photo ${idx + 1}`} className="h-full w-full object-cover"
-                      onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }} />
-                  </button>
-                ))}
-              </div>
+            {!property.availability && (
+              <span className="absolute left-3 top-3 z-30 rounded-full bg-gray-800/80 px-3 py-1 text-xs font-semibold text-white">
+                Currently unavailable
+              </span>
             )}
           </div>
 
@@ -1009,8 +988,7 @@ const PropertyDetails = () => {
               </h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 {similarProperties.map((sp) => {
-                  const spImg = (Array.isArray(sp.images) && sp.images[0]) ||
-                    'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
+                  const spImg = getFirstImageUrl(sp.images, 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60');
                   const spCity = sp.city || sp.address?.city || '';
                   return (
                     <Link

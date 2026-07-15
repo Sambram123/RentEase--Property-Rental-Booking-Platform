@@ -7,12 +7,13 @@ import {
 import { fetchOwnerBookings, fetchMyBookings } from '../services/bookingService';
 import { useAuth } from '../context/AuthContext';
 import { formatPrice } from '../utils/constants';
+import { getFirstImageUrl } from '../utils/imageUtils';
 
 const STATUS_CONFIG = {
-  pending:   { cls: 'bg-amber-50 text-amber-600 border-amber-100',   icon: FiClock,        label: 'Pending'   },
-  confirmed: { cls: 'bg-green-50 text-green-600 border-green-100',   icon: FiCheckCircle, label: 'Confirmed' },
-  cancelled: { cls: 'bg-red-50 text-red-500 border-red-100',         icon: FiXCircle,     label: 'Cancelled' },
-  completed: { cls: 'bg-blue-50 text-blue-600 border-blue-100',      icon: FiCheckCircle, label: 'Completed' },
+  pending: { cls: 'bg-amber-50 text-amber-600 border-amber-100', icon: FiClock, label: 'Pending' },
+  confirmed: { cls: 'bg-green-50 text-green-600 border-green-100', icon: FiCheckCircle, label: 'Confirmed' },
+  cancelled: { cls: 'bg-red-50 text-red-500 border-red-100', icon: FiXCircle, label: 'Cancelled' },
+  completed: { cls: 'bg-blue-50 text-blue-600 border-blue-100', icon: FiCheckCircle, label: 'Completed' },
 };
 
 const fmtDate = (d) =>
@@ -24,11 +25,11 @@ const diffDays = (a, b) =>
 // ─── BookingTimeline component ────────────────────────────────────────────────
 const BookingTimeline = ({ isOwnerView = false, maxItems = null }) => {
   const { user } = useAuth();
-  const [bookings, setBookings]   = useState([]);
-  const [loading,  setLoading]    = useState(true);
-  const [filter,   setFilter]     = useState('all');
-  const [sortBy,   setSortBy]     = useState('date');
-  const [expanded, setExpanded]   = useState({});
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('date');
+  const [expanded, setExpanded] = useState({});
 
   useEffect(() => {
     const load = async () => {
@@ -50,7 +51,7 @@ const BookingTimeline = ({ isOwnerView = false, maxItems = null }) => {
 
   // Classify bookings
   const classify = (b) => {
-    const checkIn  = new Date(b.checkInDate);
+    const checkIn = new Date(b.checkInDate);
     const checkOut = new Date(b.checkOutDate);
     if (b.bookingStatus === 'cancelled') return 'cancelled';
     if (checkIn > now) return 'upcoming';
@@ -109,11 +110,10 @@ const BookingTimeline = ({ isOwnerView = false, maxItems = null }) => {
                 key={f}
                 type="button"
                 onClick={() => setFilter(f)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium capitalize transition ${
-                  filter === f
+                className={`rounded-full px-3 py-1.5 text-xs font-medium capitalize transition ${filter === f
                     ? 'bg-primary text-white'
                     : 'bg-gray-100 text-muted hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {f}
               </button>
@@ -128,9 +128,8 @@ const BookingTimeline = ({ isOwnerView = false, maxItems = null }) => {
                 key={s}
                 type="button"
                 onClick={() => setSortBy(s)}
-                className={`rounded-lg px-2.5 py-1 capitalize transition ${
-                  sortBy === s ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-gray-100'
-                }`}
+                className={`rounded-lg px-2.5 py-1 capitalize transition ${sortBy === s ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-gray-100'
+                  }`}
               >
                 {s}
               </button>
@@ -152,25 +151,22 @@ const BookingTimeline = ({ isOwnerView = false, maxItems = null }) => {
           <div className="absolute left-5 top-0 h-full w-px bg-gradient-to-b from-primary/30 via-gray-200 to-transparent" />
 
           {displayed.map((bk) => {
-            const status  = STATUS_CONFIG[bk.bookingStatus] || STATUS_CONFIG.pending;
-            const Icon    = status.icon;
-            const cat     = classify(bk);
-            const days    = diffDays(bk.checkInDate, bk.checkOutDate);
-            const prop    = bk.property || {};
-            const img     = Array.isArray(prop.images) && prop.images[0]
-              ? prop.images[0]
-              : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
-            const isExp   = expanded[bk._id];
+            const status = STATUS_CONFIG[bk.bookingStatus] || STATUS_CONFIG.pending;
+            const Icon = status.icon;
+            const cat = classify(bk);
+            const days = diffDays(bk.checkInDate, bk.checkOutDate);
+            const prop = bk.property || {};
+            const img = getFirstImageUrl(prop.images, 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60');
+            const isExp = expanded[bk._id];
 
             return (
               <div key={bk._id} className="relative pl-12">
                 {/* Timeline dot */}
-                <div className={`absolute left-2.5 top-4 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border-2 border-white ${
-                  cat === 'active'    ? 'bg-green-500' :
-                  cat === 'upcoming'  ? 'bg-primary'   :
-                  cat === 'completed' ? 'bg-blue-500'  :
-                  'bg-gray-300'
-                } shadow`}>
+                <div className={`absolute left-2.5 top-4 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border-2 border-white ${cat === 'active' ? 'bg-green-500' :
+                    cat === 'upcoming' ? 'bg-primary' :
+                      cat === 'completed' ? 'bg-blue-500' :
+                        'bg-gray-300'
+                  } shadow`}>
                   <span className="h-1.5 w-1.5 rounded-full bg-white" />
                 </div>
 

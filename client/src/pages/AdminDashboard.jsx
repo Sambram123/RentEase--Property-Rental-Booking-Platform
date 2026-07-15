@@ -24,6 +24,7 @@ import { fetchSecurityDashboard, fetchAuditLogs } from '../services/securityServ
 import { fetchSystemMonitoring, triggerBackup } from '../services/systemService';
 import PerformanceDashboard from '../components/PerformanceDashboard';
 import { useAuth } from '../context/AuthContext';
+import { getFirstImageUrl } from '../utils/imageUtils';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -597,8 +598,8 @@ const AdminDashboard = () => {
                       <tr key={p._id} className="border-b border-gray-50 transition hover:bg-gray-50/50">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            {p.images?.[0] ? (
-                              <img src={p.images[0]} alt="" className="h-8 w-8 rounded-lg object-cover" />
+                            {getFirstImageUrl(p.images, null) ? (
+                              <img src={getFirstImageUrl(p.images)} alt="" className="h-8 w-8 rounded-lg object-cover" />
                             ) : (
                               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100"><FiHome className="h-4 w-4 text-muted" /></span>
                             )}

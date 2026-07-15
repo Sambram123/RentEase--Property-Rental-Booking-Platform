@@ -1,24 +1,35 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
-import { FiMapPin, FiStar } from 'react-icons/fi';
+import { FiMapPin, FiStar, FiCamera } from 'react-icons/fi';
 import { formatPrice } from '../utils/constants';
 import LazyImage from './LazyImage';
 
 const PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80';
 
+// ─── Extract first image URL — supports {url, public_id} objects and strings ──
+const getFirstImage = (images) => {
+  if (!Array.isArray(images) || images.length === 0) return null;
+  const first = images[0];
+  if (typeof first === 'string') return first;
+  if (first?.url) return first.url;
+  return null;
+};
+
 const PropertyCard = memo(({ property }) => {
   // Support both legacy mock shape (id, location, pricePerMonth, image)
-  // and real API shape (_id, city, price, images[])
-  const id       = property._id  || property.id;
-  const title    = property.title;
-  const location = property.city || property.address?.city || property.location || '';
-  const price    = property.price ?? property.pricePerMonth ?? 0;
+  // and real API shape (_id, city, price, images[{url,public_id}])
+  const id        = property._id  || property.id;
+  const title     = property.title;
+  const location  = property.city || property.address?.city || property.location || '';
+  const price     = property.price ?? property.pricePerMonth ?? 0;
   const bedrooms  = property.bedrooms  ?? 0;
   const bathrooms = property.bathrooms ?? 0;
   const rating    = property.rating;
-  const image     =
-    (Array.isArray(property.images) && property.images[0]) ||
+  const allImages = Array.isArray(property.images) ? property.images : [];
+  const extraPhotos = allImages.length > 1 ? allImages.length - 1 : 0;
+  const image =
+    getFirstImage(allImages) ||
     property.image ||
     PLACEHOLDER_IMAGE;
 
@@ -49,6 +60,13 @@ const PropertyCard = memo(({ property }) => {
         {property.availability === false && (
           <span className="absolute left-3 top-3 rounded-full bg-gray-800/80 px-2 py-1 text-xs font-medium text-white">
             Unavailable
+          </span>
+        )}
+        {/* +N Photos badge */}
+        {extraPhotos > 0 && (
+          <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
+            <FiCamera className="h-3 w-3" />
+            +{extraPhotos} Photos
           </span>
         )}
       </div>

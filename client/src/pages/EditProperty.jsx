@@ -7,6 +7,7 @@ import {
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
 import LocationPicker from '../components/LocationPicker';
+import ImageUploader from '../components/ImageUploader';
 import { fetchPropertyById, updateProperty } from '../services/propertyService';
 import { geoJsonToLatLng } from '../services/mapsService';
 
@@ -52,6 +53,18 @@ const Field = ({ label, id, error, children }) => (
 const inputCls =
   'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20';
 
+// ─── Normalise images from API → [{url, public_id}] ──────────────────────────
+const normaliseExistingImages = (images = []) => {
+  return images
+    .filter(Boolean)
+    .map((img) => {
+      if (typeof img === 'string') return { url: img, public_id: img }; // legacy
+      if (img.url && img.public_id) return img;
+      return null;
+    })
+    .filter(Boolean);
+};
+
 const EditProperty = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -62,6 +75,10 @@ const EditProperty = () => {
   const [saving, setSaving]     = useState(false);
   const [coords, setCoords]     = useState(null);
   const [fetchError, setFetchError] = useState('');
+
+  // Image state
+  const [existingImages, setExistingImages] = useState([]); // [{url, public_id}]
+  const [newFiles, setNewFiles]             = useState([]); // File[]
 
   // Load existing property data
   useEffect(() => {
@@ -82,10 +99,10 @@ const EditProperty = () => {
           bedrooms:     property.bedrooms  ?? '',
           bathrooms:    property.bathrooms ?? '',
           amenities:    property.amenities || [],
-          imageUrls:    (property.images || []).join(', '),
           availability: property.availability !== false,
+          cancellationPolicy: property.cancellationPolicy || 'moderate',
         });
-        // Pre-populate coords from existing GeoJSON
+        setExistingImages(normaliseExistingImages(property.images));
         const existing = geoJsonToLatLng(property.location?.coordinates);
         if (existing) setCoords(existing);
       } catch {
@@ -121,6 +138,8 @@ const EditProperty = () => {
     if (!form.state.trim())            e.state       = 'State is required';
     if (form.bedrooms === '')          e.bedrooms    = 'Bedrooms is required';
     if (form.bathrooms === '')         e.bathrooms   = 'Bathrooms is required';
+    const totalImages = existingImages.length + newFiles.length;
+    if (totalImages === 0)             e.images      = 'At least one property image is required';
     return e;
   };
 
@@ -133,35 +152,37 @@ const EditProperty = () => {
       return;
     }
 
-    const images = form.imageUrls
-      ? form.imageUrls.split(',').map((u) => u.trim()).filter(Boolean)
-      : [];
-
-    const payload = {
-      title:       form.title.trim(),
-      description: form.description.trim(),
-      type:        form.type,
-      price:       Number(form.price),
-      address: {
-        street:  form.street.trim(),
-        city:    form.city.trim(),
-        state:   form.state.trim(),
-        country: form.country.trim(),
-        zipCode: form.zipCode.trim(),
-      },
-      bedrooms:     Number(form.bedrooms),
-      bathrooms:    Number(form.bathrooms),
-      amenities:    form.amenities,
-      images,
-      availability: form.availability,
-      ...(coords && {
-        location: { type: 'Point', coordinates: [coords.lng, coords.lat] },
-      }),
-    };
+    const formData = new FormData();
+    formData.append('title',              form.title.trim());
+    formData.append('description',        form.description.trim());
+    formData.append('type',               form.type);
+    formData.append('price',              Number(form.price));
+    formData.append('bedrooms',           Number(form.bedrooms));
+    formData.append('bathrooms',          Number(form.bathrooms));
+    formData.append('availability',       form.availability);
+    formData.append('cancellationPolicy', form.cancellationPolicy);
+    formData.append('address', JSON.stringify({
+      street:  form.street.trim(),
+      city:    form.city.trim(),
+      state:   form.state.trim(),
+      country: form.country.trim(),
+      zipCode: form.zipCode.trim(),
+    }));
+    formData.append('amenities', JSON.stringify(form.amenities));
+    // Send existing images the owner wants to keep
+    formData.append('existingImages', JSON.stringify(existingImages));
+    if (coords) {
+      formData.append('location', JSON.stringify({
+        type: 'Point',
+        coordinates: [coords.lng, coords.lat],
+      }));
+    }
+    // Append new files
+    newFiles.forEach((file) => formData.append('images', file));
 
     setSaving(true);
     try {
-      await updateProperty(id, payload);
+      await updateProperty(id, formData);
       toast.success('Property updated successfully!');
       navigate('/dashboard');
     } catch (err) {
@@ -272,6 +293,32 @@ const EditProperty = () => {
             </div>
             <span className="text-sm font-medium text-secondary">Available for rent</span>
           </label>
+
+          {/* Cancellation Policy */}
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-medium text-secondary">Cancellation policy</label>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: 'flexible', label: '🟢 Flexible', desc: 'Full refund ≥7 days' },
+                { value: 'moderate', label: '🟡 Moderate', desc: 'Partial refund ≥14 days' },
+                { value: 'strict',   label: '🔴 Strict',   desc: '50% refund ≥30 days' },
+              ].map((p) => (
+                <label
+                  key={p.value}
+                  className={`cursor-pointer rounded-xl border p-3 text-center transition ${
+                    form.cancellationPolicy === p.value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input type="radio" name="cancellationPolicy" value={p.value}
+                    checked={form.cancellationPolicy === p.value} onChange={handleChange} className="sr-only" />
+                  <p className="text-sm font-semibold text-secondary">{p.label}</p>
+                  <p className="mt-0.5 text-xs text-muted">{p.desc}</p>
+                </label>
+              ))}
+            </div>
+          </div>
         </section>
 
         {/* Address */}
@@ -339,20 +386,31 @@ const EditProperty = () => {
         </section>
 
         {/* Images */}
-        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <SectionTitle icon={FiImage} title="Images" />
-          <Field label="Image URLs (comma-separated)" id="imageUrls">
-            <textarea id="imageUrls" name="imageUrls" rows={3}
-              placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg"
-              value={form.imageUrls} onChange={handleChange}
-              className={`${inputCls} resize-none`} />
-          </Field>
+        <section className={`rounded-2xl border bg-white p-6 shadow-sm ${errors.images ? 'border-red-200' : 'border-gray-100'}`}>
+          <SectionTitle icon={FiImage} title="Property photos *" />
+          <p className="mb-4 text-xs text-muted">
+            Manage your property photos. Remove existing images or add new ones. The first image is the cover photo.
+          </p>
+          <ImageUploader
+            newFiles={newFiles}
+            onNewFilesChange={(files) => {
+              setNewFiles(files);
+              setErrors((prev) => ({ ...prev, images: '' }));
+            }}
+            existingImages={existingImages}
+            onExistingChange={(imgs) => {
+              setExistingImages(imgs);
+              setErrors((prev) => ({ ...prev, images: '' }));
+            }}
+            error={errors.images}
+          />
         </section>
 
         {/* Actions */}
         <div className="flex items-center gap-4">
           <button
             type="submit" disabled={saving}
+            id="save-property-btn"
             className="flex items-center gap-2 rounded-xl bg-primary px-8 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark disabled:opacity-60"
           >
             {saving && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}

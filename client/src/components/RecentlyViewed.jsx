@@ -4,6 +4,7 @@ import { FiClock, FiArrowRight, FiHome, FiMapPin, FiStar } from 'react-icons/fi'
 import { fetchRecentlyViewed } from '../services/recommendationService';
 import { formatPrice } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
+import { getFirstImageUrl } from '../utils/imageUtils';
 
 const PLACEHOLDER = 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
 
@@ -65,7 +66,7 @@ const RecentlyViewed = ({ maxItems = 6, showTitle = true }) => {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {properties.map((p) => {
-            const img = (Array.isArray(p.images) && p.images[0]) || PLACEHOLDER;
+            const img = getFirstImageUrl(p.images, PLACEHOLDER);
             const city = p.city || p.address?.city || '';
             return (
               <Link

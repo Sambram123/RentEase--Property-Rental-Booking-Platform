@@ -24,6 +24,7 @@ import ActivityFeed from '../components/ActivityFeed';
 import BookingTimeline from '../components/BookingTimeline';
 import { useChat } from '../context/ChatContext';
 import { getUserAvatar } from '../utils/avatar';
+import { getFirstImageUrl } from '../utils/imageUtils';
 
 // ─── Skeleton loader ──────────────────────────────────────────────────────────
 const SkeletonCard = () => (
@@ -392,7 +393,7 @@ const OwnerDashboard = () => {
           </h2>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {propertyPerformance.map((prop) => {
-              const image = (Array.isArray(prop.images) && prop.images[0]) || PLACEHOLDER;
+              const image = getFirstImageUrl(prop.images, PLACEHOLDER);
               return (
                 <div key={prop._id} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-md">
                   <div className="relative aspect-[16/9]">
@@ -497,7 +498,7 @@ const OwnerDashboard = () => {
               {recentBookings.map((bk) => {
                 const prop = bk.property || {};
                 const guest = bk.user || {};
-                const img = (Array.isArray(prop.images) && prop.images[0]) || PLACEHOLDER;
+                const img = getFirstImageUrl(prop.images, PLACEHOLDER);
                 return (
                   <div key={bk._id} className="flex items-center gap-3 rounded-xl border border-gray-50 bg-gray-50/30 p-3 transition hover:bg-gray-50">
                     <img

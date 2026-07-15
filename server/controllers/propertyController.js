@@ -1,5 +1,6 @@
 import asyncHandler from '../utils/asyncHandler.js';
 import Property from '../models/Property.js';
+import { uploadImages, deleteImage, deleteImages } from '../services/cloudinaryService.js';
 
 // ─── Allowed amenity values (mirrors the schema enum) ────────────────────────
 const VALID_AMENITIES = [
@@ -86,14 +87,14 @@ const buildFilterQuery = (query) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // @desc    Create a new property listing
-// @route   POST /api/properties
+// @route   POST /api/properties  (multipart/form-data)
 // @access  Private (owner / admin)
 // ─────────────────────────────────────────────────────────────────────────────
 const createProperty = asyncHandler(async (req, res) => {
   const {
     title, description, type, price,
     address, bedrooms, bathrooms, amenities,
-    images, availability, location,
+    availability, location, cancellationPolicy,
   } = req.body;
 
   // ── Required field validation ─────────────────────────────────────────────
@@ -101,11 +102,22 @@ const createProperty = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Title, description, type, and price are required');
   }
-  if (!address?.city || !address?.state || !address?.country) {
+
+  // Parse address if sent as JSON string (multipart forms stringify objects)
+  let parsedAddress = address;
+  if (typeof address === 'string') {
+    try { parsedAddress = JSON.parse(address); } catch { /* leave as-is */ }
+  }
+
+  if (!parsedAddress?.city || !parsedAddress?.state || !parsedAddress?.country) {
     res.status(400);
     throw new Error('Address (city, state, country) is required');
   }
-  if (bedrooms === undefined || bathrooms === undefined) {
+  if (bedrooms === undefined || bedrooms === null || bedrooms === '') {
+    res.status(400);
+    throw new Error('Bedrooms and bathrooms are required');
+  }
+  if (bathrooms === undefined || bathrooms === null || bathrooms === '') {
     res.status(400);
     throw new Error('Bedrooms and bathrooms are required');
   }
@@ -114,15 +126,37 @@ const createProperty = asyncHandler(async (req, res) => {
     throw new Error(`Invalid property type. Valid: ${VALID_TYPES.join(', ')}`);
   }
 
+  // ── Image validation ──────────────────────────────────────────────────────
+  const files = req.files || [];
+  if (files.length === 0) {
+    res.status(400);
+    throw new Error('At least one property image is required');
+  }
+  if (files.length > 10) {
+    res.status(400);
+    throw new Error('Maximum 10 images allowed');
+  }
+
+  // ── Upload images to Cloudinary ───────────────────────────────────────────
+  const uploadedImages = await uploadImages(files);
+
   // ── Sanitise amenities — ignore unknown values ────────────────────────────
-  const cleanAmenities = Array.isArray(amenities)
-    ? amenities.filter((a) => VALID_AMENITIES.includes(a))
+  let parsedAmenities = amenities;
+  if (typeof amenities === 'string') {
+    try { parsedAmenities = JSON.parse(amenities); } catch { parsedAmenities = []; }
+  }
+  const cleanAmenities = Array.isArray(parsedAmenities)
+    ? parsedAmenities.filter((a) => VALID_AMENITIES.includes(a))
     : [];
 
   // Validate location if provided
   let cleanLocation;
-  if (location?.coordinates && Array.isArray(location.coordinates) && location.coordinates.length === 2) {
-    cleanLocation = { type: 'Point', coordinates: location.coordinates };
+  let parsedLocation = location;
+  if (typeof location === 'string') {
+    try { parsedLocation = JSON.parse(location); } catch { /* ignore */ }
+  }
+  if (parsedLocation?.coordinates && Array.isArray(parsedLocation.coordinates) && parsedLocation.coordinates.length === 2) {
+    cleanLocation = { type: 'Point', coordinates: parsedLocation.coordinates };
   }
 
   const property = await Property.create({
@@ -130,12 +164,13 @@ const createProperty = asyncHandler(async (req, res) => {
     description: description.trim(),
     type:        type.toLowerCase(),
     price:       Number(price),
-    address,
+    address:     parsedAddress,
     bedrooms:    Number(bedrooms),
     bathrooms:   Number(bathrooms),
     amenities:   cleanAmenities,
-    images:      Array.isArray(images) ? images : [],
-    availability: availability !== false,
+    images:      uploadedImages,
+    availability: availability === 'false' ? false : availability !== false,
+    cancellationPolicy: cancellationPolicy || 'moderate',
     owner:       req.user._id,
     ...(cleanLocation && { location: cleanLocation }),
   });
@@ -236,7 +271,7 @@ const getOwnerProperties = asyncHandler(async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // @desc    Update a property listing
-// @route   PUT /api/properties/:id
+// @route   PUT /api/properties/:id  (multipart/form-data)
 // @access  Private (owner of property / admin)
 // ─────────────────────────────────────────────────────────────────────────────
 const updateProperty = asyncHandler(async (req, res) => {
@@ -256,21 +291,73 @@ const updateProperty = asyncHandler(async (req, res) => {
     throw new Error('Not authorized — you do not own this property');
   }
 
+  // ── Parse existing images JSON (images to keep) ───────────────────────────
+  let existingImages = [];
+  if (req.body.existingImages) {
+    try {
+      existingImages = JSON.parse(req.body.existingImages);
+      if (!Array.isArray(existingImages)) existingImages = [];
+    } catch { existingImages = []; }
+  }
+
+  // ── Determine which old images were removed → delete from Cloudinary ──────
+  const oldPublicIds = (property.images || []).map((img) => img.public_id).filter(Boolean);
+  const keepPublicIds = existingImages.map((img) => img.public_id).filter(Boolean);
+  const toDeleteIds   = oldPublicIds.filter((pid) => !keepPublicIds.includes(pid));
+  if (toDeleteIds.length) {
+    await deleteImages(toDeleteIds);
+  }
+
+  // ── Upload any new files ──────────────────────────────────────────────────
+  const newFiles = req.files || [];
+  const totalImages = existingImages.length + newFiles.length;
+
+  if (totalImages > 10) {
+    res.status(400);
+    throw new Error('Maximum 10 images allowed');
+  }
+
+  let newUploads = [];
+  if (newFiles.length > 0) {
+    newUploads = await uploadImages(newFiles);
+  }
+
+  // ── Merge existing + new images ───────────────────────────────────────────
+  const mergedImages = [...existingImages, ...newUploads];
+
+  // ── Update allowed text fields ────────────────────────────────────────────
   const allowed = [
     'title', 'description', 'type', 'price', 'address',
-    'bedrooms', 'bathrooms', 'amenities', 'images', 'availability',
+    'bedrooms', 'bathrooms', 'amenities', 'availability',
     'cancellationPolicy',
   ];
 
   allowed.forEach((field) => {
     if (req.body[field] !== undefined) {
-      property[field] = req.body[field];
+      let val = req.body[field];
+      // Parse JSON-stringified fields from multipart
+      if (typeof val === 'string' && (field === 'address' || field === 'amenities')) {
+        try { val = JSON.parse(val); } catch { /* leave as string */ }
+      }
+      if (field === 'price' || field === 'bedrooms' || field === 'bathrooms') {
+        val = Number(val);
+      }
+      if (field === 'availability') {
+        val = val === 'false' ? false : val !== false;
+      }
+      property[field] = val;
     }
   });
 
+  property.images = mergedImages;
+
   // Handle location update separately to validate GeoJSON structure
-  if (req.body.location?.coordinates && Array.isArray(req.body.location.coordinates) && req.body.location.coordinates.length === 2) {
-    property.location = { type: 'Point', coordinates: req.body.location.coordinates };
+  let parsedLocation = req.body.location;
+  if (typeof parsedLocation === 'string') {
+    try { parsedLocation = JSON.parse(parsedLocation); } catch { parsedLocation = null; }
+  }
+  if (parsedLocation?.coordinates && Array.isArray(parsedLocation.coordinates) && parsedLocation.coordinates.length === 2) {
+    property.location = { type: 'Point', coordinates: parsedLocation.coordinates };
   }
 
   const updated = await property.save();
@@ -283,7 +370,45 @@ const updateProperty = asyncHandler(async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// @desc    Delete a property listing
+// @desc    Delete a single image from a property (and from Cloudinary)
+// @route   DELETE /api/properties/:id/images/:public_id
+// @access  Private (owner of property / admin)
+// ─────────────────────────────────────────────────────────────────────────────
+const deletePropertyImage = asyncHandler(async (req, res) => {
+  const property = await Property.findById(req.params.id);
+
+  if (!property) {
+    res.status(404);
+    throw new Error('Property not found');
+  }
+
+  if (
+    req.user.role !== 'admin' &&
+    property.owner.toString() !== req.user._id.toString()
+  ) {
+    res.status(403);
+    throw new Error('Not authorized — you do not own this property');
+  }
+
+  // Decode the public_id from URL param (slashes are encoded)
+  const public_id = decodeURIComponent(req.params.public_id);
+
+  // Remove from property images array
+  property.images = property.images.filter((img) => img.public_id !== public_id);
+  await property.save();
+
+  // Delete from Cloudinary (fire-and-forget style, but await for reliability)
+  await deleteImage(public_id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Image deleted successfully',
+    data: { images: property.images },
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// @desc    Delete a property listing (and all its Cloudinary images)
 // @route   DELETE /api/properties/:id
 // @access  Private (owner of property / admin)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -303,6 +428,12 @@ const deleteProperty = asyncHandler(async (req, res) => {
     throw new Error('Not authorized — you do not own this property');
   }
 
+  // Delete all associated Cloudinary images
+  const publicIds = (property.images || []).map((img) => img.public_id).filter(Boolean);
+  if (publicIds.length) {
+    await deleteImages(publicIds);
+  }
+
   await property.deleteOne();
 
   res.status(200).json({
@@ -319,4 +450,5 @@ export {
   getOwnerProperties,
   updateProperty,
   deleteProperty,
+  deletePropertyImage,
 };
