@@ -23,3 +23,9 @@ export const deleteReview = async (reviewId) => {
   const { data } = await api.delete(`/reviews/${reviewId}`);
   return data;
 };
+
+// ─── Get recent high-rated reviews (home page) ───────────────────────────────────────
+export const fetchRecentReviews = async (limit = 3) => {
+  const { data } = await api.get('/reviews/recent', { params: { limit } });
+  return data.data.reviews;
+};

@@ -2,25 +2,24 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   FiSearch, FiMapPin, FiTrendingUp, FiStar,
-  FiHome, FiArrowRight,
+  FiHome,
 } from 'react-icons/fi';
 import PropertyCard from '../components/PropertyCard';
 import LazyImage from '../components/LazyImage';
 import Loader from '../components/Loader';
 import SEO, { organizationSchema, websiteSchema } from '../components/SEO';
-import { fetchTrending, fetchFeatured, fetchPopularCities } from '../services/recommendationService';
+import { fetchTrending } from '../services/recommendationService';
 import { trackSearch } from '../services/recommendationService';
+import { fetchRecentReviews } from '../services/reviewService';
 import { useAuth } from '../context/AuthContext';
 import { formatPrice } from '../utils/constants';
 import { getFirstImageUrl } from '../utils/imageUtils';
 
 const PLACEHOLDER = 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=60';
 
-const CITY_EMOJIS = { Delhi: '🏛️', Mumbai: '🌊', Bangalore: '🌿', Chennai: '🏖️', Hyderabad: '🍖', Pune: '🌸', Kolkata: '🎨', Ahmedabad: '🛕' };
-
-// ─── Minimal PropertyMiniCard for trending/featured ───────────────────────────
+// ─── Minimal PropertyMiniCard for trending ────────────────────────────────────
 const PropertyMiniCard = ({ property }) => {
-  const img  = getFirstImageUrl(property.images, PLACEHOLDER);
+  const img = getFirstImageUrl(property.images, PLACEHOLDER);
   const city = property.city || property.address?.city || '';
   return (
     <Link
@@ -64,31 +63,40 @@ const PropertyMiniCard = ({ property }) => {
 const Home = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const [trending,     setTrending]     = useState([]);
-  const [featured,     setFeatured]     = useState([]);
-  const [popularCities, setPopularCities] = useState([]);
-  const [loadingProps, setLoadingProps] = useState(true);
+  const [trending, setTrending]           = useState([]);
+  const [loadingProps, setLoadingProps]   = useState(true);
+  const [reviews, setReviews]             = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(true);
 
   // Search state
   const [searchCity, setSearchCity] = useState('');
   const [searchType, setSearchType] = useState('');
 
-  // Load discovery data
+  // Load trending properties
   useEffect(() => {
     const load = async () => {
       try {
-        const [t, f, c] = await Promise.all([
-          fetchTrending(8).catch(() => ({ properties: [] })),
-          fetchFeatured(8).catch(() => ({ properties: [] })),
-          fetchPopularCities(8).catch(() => ({ cities: [] })),
-        ]);
+        const t = await fetchTrending(8).catch(() => ({ properties: [] }));
         setTrending(t.properties || []);
-        setFeatured(f.properties || []);
-        setPopularCities(c.cities || []);
       } catch {
         // silently skip
       } finally {
         setLoadingProps(false);
+      }
+    };
+    load();
+  }, []);
+
+  // Load real reviews from the database
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await fetchRecentReviews(3);
+        setReviews(data || []);
+      } catch {
+        // silently skip
+      } finally {
+        setLoadingReviews(false);
       }
     };
     load();
@@ -99,14 +107,12 @@ const Home = () => {
     if (searchCity.trim()) params.set('city', searchCity.trim());
     if (searchType.trim()) params.set('type', searchType.trim());
 
-    // Track search for personalization
     if (isAuthenticated) {
       trackSearch({ city: searchCity.trim() || undefined, type: searchType.trim() || undefined });
     }
     navigate(`/properties?${params.toString()}`);
   }, [searchCity, searchType, navigate, isAuthenticated]);
 
-  const showFeatured = featured.length > 0;
   const showTrending = trending.length > 0;
 
   return (
@@ -116,8 +122,9 @@ const Home = () => {
         structuredData={[organizationSchema, websiteSchema]}
         keywords="rental properties, apartments for rent, rent house India, find rental property, book apartment online, Bangalore apartments, Mumbai flats, Delhi rental"
       />
+
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-rose-50/80 to-white px-4 pb-16 pt-12 sm:px-6 lg:px-8 lg:pb-24 lg:pt-20">
+      <section className="relative overflow-hidden bg-gradient-to-b from-rose-50/80 to-white px-4 pb-10 pt-10 sm:px-6 lg:px-8 lg:pb-14 lg:pt-14">
         <div className="mx-auto max-w-4xl text-center">
           <span className="inline-flex items-center rounded-full bg-white px-4 py-1.5 text-xs font-medium text-primary shadow-sm ring-1 ring-rose-100">
             Book apartments · Pay advance rent online
@@ -178,31 +185,10 @@ const Home = () => {
         </div>
       </section>
 
-      {/* ── Popular Cities ────────────────────────────────────────────────── */}
-      {popularCities.length > 0 && (
-        <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <h2 className="mb-6 text-2xl font-bold text-secondary">Popular Cities</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-            {popularCities.map((c) => (
-              <Link
-                key={c.city}
-                to={`/properties?city=${encodeURIComponent(c.city)}`}
-                className="group flex flex-col items-center rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:border-primary/30 hover:shadow-md"
-                id={`city-${c.city.toLowerCase().replace(/\s/g, '-')}`}
-              >
-                <span className="text-3xl">{CITY_EMOJIS[c.city] || '🏙️'}</span>
-                <p className="mt-2 text-center text-sm font-semibold text-secondary group-hover:text-primary">{c.city}</p>
-                <p className="text-xs text-muted">{c.count} listing{c.count !== 1 ? 's' : ''}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* ── Trending Properties ───────────────────────────────────────────── */}
       {(showTrending || loadingProps) && (
-        <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-          <div className="mb-6 flex items-end justify-between gap-4">
+        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mb-5 flex items-end justify-between gap-4">
             <div>
               <h2 className="flex items-center gap-2 text-2xl font-bold text-secondary sm:text-3xl">
                 <FiTrendingUp className="h-6 w-6 text-primary" /> Trending Properties
@@ -235,32 +221,10 @@ const Home = () => {
         </section>
       )}
 
-      {/* ── Featured Properties ───────────────────────────────────────────── */}
-      {(showFeatured || loadingProps) && (
-        <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-          <div className="mb-6 flex items-end justify-between gap-4">
-            <div>
-              <h2 className="flex items-center gap-2 text-2xl font-bold text-secondary sm:text-3xl">
-                <FiStar className="h-6 w-6 text-amber-500" /> Featured Properties
-              </h2>
-              <p className="mt-1 text-muted">Handpicked rentals with top ratings</p>
-            </div>
-            <Link to="/properties?sort=rating" className="hidden text-sm font-medium text-primary transition hover:text-primary-dark sm:block">
-              View all →
-            </Link>
-          </div>
-          {loadingProps ? null : (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {featured.slice(0, 4).map((p) => <PropertyMiniCard key={p._id} property={p} />)}
-            </div>
-          )}
-        </section>
-      )}
-
       {/* ── Why RentEase ─────────────────────────────────────────────────── */}
-      <section className="border-t border-gray-100 bg-gray-50/50 px-4 py-16 sm:px-6 lg:px-8">
+      <section className="border-t border-gray-100 bg-gray-50/50 px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          <div className="mb-10 text-center">
+          <div className="mb-8 text-center">
             <h2 className="text-2xl font-bold text-secondary sm:text-3xl">Why choose RentEase?</h2>
             <p className="mt-2 text-muted">Everything you need to find your perfect rental</p>
           </div>
@@ -280,99 +244,121 @@ const Home = () => {
         </div>
       </section>
 
-      {/* ── Platform Stats ────────────────────────────────────────────────── */}
-      <section className="bg-primary px-4 py-16 sm:px-6 lg:px-8">
+      {/* ── Testimonials (live from DB) ───────────────────────────────────── */}
+      <section className="border-t border-gray-100 bg-white px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          <div className="grid grid-cols-2 gap-8 text-center text-white md:grid-cols-4">
-            {[
-              { value: '10,000+', label: 'Properties listed' },
-              { value: '50,000+', label: 'Happy tenants' },
-              { value: '8 Cities', label: 'Pan-India coverage' },
-              { value: '4.8★',    label: 'Average rating' },
-            ].map(({ value, label }) => (
-              <div key={label}>
-                <p className="text-3xl font-bold sm:text-4xl">{value}</p>
-                <p className="mt-1 text-sm text-white/80">{label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Testimonials ─────────────────────────────────────────────────── */}
-      <section className="border-t border-gray-100 bg-white px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-10 text-center">
+          <div className="mb-8 text-center">
             <h2 className="text-2xl font-bold text-secondary sm:text-3xl">What our tenants say</h2>
             <p className="mt-2 text-muted">Real experiences from real renters</p>
           </div>
-          <div className="grid gap-6 md:grid-cols-3">
-            {[
-              {
-                name: 'Priya Sharma',
-                city: 'Bangalore',
-                rating: 5,
-                text: 'Found my perfect 2 BHK in Koramangala within 3 days. The booking process was seamless and the owner was very responsive.',
-                avatar: '👩‍💼',
-              },
-              {
-                name: 'Rahul Mehta',
-                city: 'Mumbai',
-                rating: 5,
-                text: 'RentEase made relocating to Mumbai so much easier. Transparent pricing, verified listings, and secure payments. Highly recommend!',
-                avatar: '👨‍💻',
-              },
-              {
-                name: 'Anjali Reddy',
-                city: 'Hyderabad',
-                rating: 5,
-                text: 'Booked a studio near my office in minutes. The advance payment via Razorpay was smooth and I got instant confirmation.',
-                avatar: '👩‍🎓',
-              },
-            ].map((t) => (
-              <div key={t.name} className="rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
-                <div className="flex items-center gap-1 text-amber-400">
-                  {'★'.repeat(t.rating)}
-                </div>
-                <p className="mt-3 text-sm leading-relaxed text-secondary">"{t.text}"</p>
-                <div className="mt-4 flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xl">
-                    {t.avatar}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-secondary">{t.name}</p>
-                    <p className="text-xs text-muted">{t.city}</p>
+
+          {loadingReviews ? (
+            <div className="grid gap-6 md:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="animate-pulse rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
+                  <div className="flex gap-1 mb-3">
+                    {Array.from({ length: 5 }).map((_, j) => (
+                      <div key={j} className="h-4 w-4 rounded bg-gray-200" />
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-3 rounded bg-gray-200 w-full" />
+                    <div className="h-3 rounded bg-gray-200 w-5/6" />
+                    <div className="h-3 rounded bg-gray-200 w-4/6" />
+                  </div>
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-gray-200" />
+                    <div className="space-y-1">
+                      <div className="h-3 w-24 rounded bg-gray-200" />
+                      <div className="h-2 w-16 rounded bg-gray-200" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Final CTA ─────────────────────────────────────────────────────── */}
-      <section className="border-t border-gray-100 bg-gradient-to-b from-rose-50/60 to-white px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-2xl font-bold text-secondary sm:text-3xl">
-            Ready to find your next home?
-          </h2>
-          <p className="mt-3 text-muted">
-            Browse thousands of verified rental properties across India and book your perfect space today.
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <a
-              href="/properties"
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow transition hover:bg-primary-dark"
-            >
-              Browse Properties
-            </a>
-            <a
-              href="/register"
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-secondary shadow-sm transition hover:bg-gray-50"
-            >
-              Create free account
-            </a>
-          </div>
+              ))}
+            </div>
+          ) : reviews.length > 0 ? (
+            <div className="grid gap-6 md:grid-cols-3">
+              {reviews.map((r) => {
+                const city =
+                  r.property?.city ||
+                  r.property?.address?.city ||
+                  '';
+                const propertyTitle = r.property?.title || '';
+                return (
+                  <div key={r._id} className="rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
+                    <div className="flex items-center gap-1 text-amber-400">
+                      {'★'.repeat(r.rating)}
+                      <span className="ml-1 text-xs text-muted font-normal">({r.rating}/5)</span>
+                    </div>
+                    <p className="mt-3 text-sm leading-relaxed text-secondary">"{r.comment}"</p>
+                    {propertyTitle && (
+                      <p className="mt-2 text-xs text-primary/70 italic line-clamp-1">{propertyTitle}</p>
+                    )}
+                    <div className="mt-4 flex items-center gap-3">
+                      {r.user?.avatar ? (
+                        <img
+                          src={r.user.avatar}
+                          alt={r.user.name}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xl">
+                          👤
+                        </span>
+                      )}
+                      <div>
+                        <p className="text-sm font-semibold text-secondary">{r.user?.name || 'Tenant'}</p>
+                        {city && <p className="text-xs text-muted">{city}</p>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Fallback static reviews if no DB reviews exist yet */
+            <div className="grid gap-6 md:grid-cols-3">
+              {[
+                {
+                  name: 'Priya Sharma',
+                  city: 'Bangalore',
+                  rating: 5,
+                  text: 'Found my perfect 2 BHK in Koramangala within 3 days. The booking process was seamless and the owner was very responsive.',
+                  avatar: '👩‍💼',
+                },
+                {
+                  name: 'Rahul Mehta',
+                  city: 'Mumbai',
+                  rating: 5,
+                  text: 'RentEase made relocating to Mumbai so much easier. Transparent pricing, verified listings, and secure payments. Highly recommend!',
+                  avatar: '👨‍💻',
+                },
+                {
+                  name: 'Anjali Reddy',
+                  city: 'Hyderabad',
+                  rating: 5,
+                  text: 'Booked a studio near my office in minutes. The advance payment via Razorpay was smooth and I got instant confirmation.',
+                  avatar: '👩‍🎓',
+                },
+              ].map((t) => (
+                <div key={t.name} className="rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
+                  <div className="flex items-center gap-1 text-amber-400">
+                    {'★'.repeat(t.rating)}
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-secondary">"{t.text}"</p>
+                  <div className="mt-4 flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xl">
+                      {t.avatar}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-secondary">{t.name}</p>
+                      <p className="text-xs text-muted">{t.city}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </>

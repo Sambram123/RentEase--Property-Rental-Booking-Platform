@@ -5,7 +5,7 @@ import ConversationList from '../components/ConversationList';
 import ChatWindow from '../components/ChatWindow';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
-import { deleteConversationApi, archiveConversationApi } from '../services/messageService';
+import { deleteConversationApi } from '../services/messageService';
 import toast from 'react-hot-toast';
 
 const Messages = () => {
@@ -16,7 +16,6 @@ const Messages = () => {
   const [activeConversation, setActiveConversation] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileShowChat, setMobileShowChat] = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
 
   // Auto-select conversation from URL params (?conversation=id)
   useEffect(() => {
@@ -36,7 +35,7 @@ const Messages = () => {
       refreshConversations();
     }, 300);
     return () => clearTimeout(delayDebounce);
-  }, [searchQuery, showArchived, refreshConversations]);
+  }, [searchQuery, refreshConversations]);
 
   const handleSelectConversation = (conv) => {
     setActiveConversation(conv);
@@ -67,20 +66,6 @@ const Messages = () => {
     }
   };
 
-  const handleArchiveConversation = async (conversationId, archive) => {
-    try {
-      await archiveConversationApi(conversationId, archive);
-      setConversations((prev) => prev.filter((c) => c._id !== conversationId));
-      if (activeConversation?._id === conversationId) {
-        setActiveConversation(null);
-        setMobileShowChat(false);
-        setSearchParams({});
-      }
-      toast.success(archive ? 'Conversation archived' : 'Conversation unarchived');
-    } catch (err) {
-      toast.error(err.message || 'Failed to archive conversation');
-    }
-  };
 
   // Filter conversations locally by search query if needed as fallback, or use raw list
   const filteredConversations = conversations.filter((c) => {
@@ -93,10 +78,10 @@ const Messages = () => {
   });
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-4 sm:py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 pt-2 sm:px-6 lg:px-8">
       <div
         className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
-        style={{ height: 'calc(100dvh - 140px)', minHeight: '400px' }}
+        style={{ height: 'calc(100dvh - 100px)', minHeight: '400px' }}
       >
         <div className="flex h-full">
           {/* Sidebar — conversations */}
@@ -110,13 +95,10 @@ const Messages = () => {
               activeId={activeConversation?._id}
               onSelect={handleSelectConversation}
               onDelete={handleDeleteConversation}
-              onArchive={handleArchiveConversation}
               currentUserId={user?._id}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               loading={loadingConversations}
-              showArchived={showArchived}
-              onToggleArchived={() => setShowArchived(!showArchived)}
             />
           </div>
 

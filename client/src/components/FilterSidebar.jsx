@@ -1,4 +1,4 @@
-import { FiSliders, FiX } from 'react-icons/fi';
+import { FiSettings, FiX } from 'react-icons/fi';
 
 const PROPERTY_TYPES = [
   { value: '', label: 'All types' },
@@ -15,6 +15,13 @@ const AMENITIES = [
   'pool', 'security', 'lift', 'power_backup', 'garden',
 ];
 
+export const SORT_OPTIONS = [
+  { value: 'newest',     label: 'Newest first' },
+  { value: 'price_asc',  label: 'Price: Low → High' },
+  { value: 'price_desc', label: 'Price: High → Low' },
+  { value: 'rating',     label: 'Highest rated' },
+];
+
 const clsInput =
   'w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20';
 
@@ -25,6 +32,8 @@ const FilterSidebar = ({
   onReset,
   open,
   onClose,
+  sort,
+  onSortChange,
 }) => {
   const toggleAmenity = (item) => {
     setFilters((prev) => {
@@ -43,7 +52,7 @@ const FilterSidebar = ({
     <div className={shell}>
       <div className="mb-4 flex items-center justify-between">
         <h3 className="flex items-center gap-2 font-semibold text-secondary">
-          <FiSliders className="h-4 w-4 text-primary" /> Filters
+          <FiSettings className="h-4 w-4 text-primary" /> Refine Search
         </h3>
         <button type="button" onClick={onClose} className="md:hidden rounded p-1 hover:bg-gray-100">
           <FiX className="h-4 w-4" />
@@ -51,6 +60,21 @@ const FilterSidebar = ({
       </div>
 
       <div className="space-y-4">
+
+        {/* Sort — moved from toolbar */}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Sort by</label>
+          <select
+            value={sort}
+            onChange={(e) => onSortChange(e.target.value)}
+            className={clsInput}
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+
         <div>
           <label className="mb-1 block text-xs font-medium text-muted">Type</label>
           <select

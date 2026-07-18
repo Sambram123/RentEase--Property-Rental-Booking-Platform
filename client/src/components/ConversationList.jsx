@@ -1,5 +1,5 @@
 import { memo, useCallback } from 'react';
-import { FiMessageSquare, FiSearch, FiUser, FiTrash2, FiArchive, FiInbox } from 'react-icons/fi';
+import { FiMessageSquare, FiSearch, FiUser, FiTrash2 } from 'react-icons/fi';
 import { useChat } from '../context/ChatContext';
 import { getUserAvatar } from '../utils/avatar';
 
@@ -25,13 +25,10 @@ const ConversationList = memo(({
   activeId,
   onSelect,
   onDelete,
-  onArchive,
   currentUserId,
   searchQuery,
   onSearchChange,
   loading,
-  showArchived,
-  onToggleArchived,
 }) => {
   const { onlineUsers, typingUsers } = useChat();
 
@@ -43,30 +40,17 @@ const ConversationList = memo(({
           <FiMessageSquare className="h-5 w-5 text-primary" />
           Messages
         </h2>
-        {/* Search & Toggle Archived */}
-        <div className="flex items-center justify-between mt-3">
-          <div className="relative flex-1">
-            <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-            <input
-              type="text"
-              placeholder="Search conversations…"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50/60 py-2 pl-10 pr-4 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-              id="conversation-search"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={onToggleArchived}
-            className={`ml-2 px-3 py-2 rounded-xl text-xs font-semibold border transition shrink-0 ${
-              showArchived
-                ? 'bg-primary/10 border-primary/20 text-primary'
-                : 'bg-white border-gray-200 text-secondary hover:bg-gray-50'
-            }`}
-          >
-            {showArchived ? 'Show Active' : 'Show Archived'}
-          </button>
+        {/* Search */}
+        <div className="relative mt-3">
+          <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input
+            type="text"
+            placeholder="Search conversations…"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full rounded-xl border border-gray-200 bg-gray-50/60 py-2 pl-10 pr-4 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            id="conversation-search"
+          />
         </div>
       </div>
 
@@ -88,13 +72,11 @@ const ConversationList = memo(({
           <div className="flex flex-col items-center py-16 text-center px-4">
             <FiMessageSquare className="h-12 w-12 text-gray-200" />
             <p className="mt-3 text-sm font-medium text-secondary">
-              {showArchived ? 'No archived chats' : 'No conversations yet'}
+              No conversations yet
             </p>
-            {!showArchived && (
-              <p className="mt-1 text-xs text-muted">
-                Start a conversation by contacting a property owner
-              </p>
-            )}
+            <p className="mt-1 text-xs text-muted">
+              Start a conversation by contacting a property owner
+            </p>
           </div>
         ) : (
           <div className="p-2 space-y-1">
@@ -196,17 +178,6 @@ const ConversationList = memo(({
 
                   {/* Actions (visible on hover) */}
                   <div className="flex flex-col items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onArchive(conv._id, !showArchived);
-                      }}
-                      title={showArchived ? 'Unarchive' : 'Archive'}
-                      className="p-1 text-gray-400 hover:text-primary rounded-lg hover:bg-gray-100 transition"
-                    >
-                      {showArchived ? <FiInbox className="h-3.5 w-3.5" /> : <FiArchive className="h-3.5 w-3.5" />}
-                    </button>
                     <button
                       type="button"
                       onClick={(e) => {

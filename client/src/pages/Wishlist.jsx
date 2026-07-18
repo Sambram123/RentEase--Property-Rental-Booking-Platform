@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiHeart, FiTrash2, FiMapPin } from 'react-icons/fi';
+import { FiHeart, FiTrash2, FiMapPin, FiStar } from 'react-icons/fi';
 import toast from 'react-hot-toast';
-import StarRating from '../components/StarRating';
 import LazyImage from '../components/LazyImage';
 import { PropertyGridSkeleton } from '../components/SkeletonLoaders';
 import { fetchWishlist, removeFromWishlist } from '../services/wishlistService';
@@ -84,7 +83,7 @@ const Wishlist = () => {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {properties.map((property) => {
             const image = getFirstImageUrl(property.images, PLACEHOLDER);
             const location =
@@ -105,8 +104,9 @@ const Wishlist = () => {
                     fallback={<img src={PLACEHOLDER} alt={property.title} className="h-full w-full object-cover" />}
                   />
                   {property.rating > 0 && (
-                    <div className="absolute right-3 top-3">
-                      <StarRating value={property.rating} size="sm" showLabel />
+                    <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-bold text-amber-500 shadow-sm">
+                      <FiStar className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      {Number(property.rating).toFixed(1)}
                     </div>
                   )}
                 </Link>

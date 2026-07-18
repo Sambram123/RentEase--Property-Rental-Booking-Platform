@@ -133,26 +133,20 @@ const ImageCarousel = ({ images, title = 'Property', className = '' }) => {
         )}
       </div>
 
-      {/* ── Line pagination indicators ─────────────────────────────────────── */}
+      {/* ── Line indicators ─────────────────────────────────────────────────── */}
       {total > 1 && (
-        <div
-          className="flex gap-1.5 justify-center px-4 pt-3 pb-1"
-          role="tablist"
-          aria-label="Image navigation"
-        >
+        <div className="flex items-center justify-center gap-1.5 px-4 pt-2.5 pb-1">
           {urls.map((_, idx) => (
             <button
               key={idx}
               type="button"
-              role="tab"
-              aria-selected={idx === active}
               aria-label={`Go to image ${idx + 1}`}
               onClick={() => goTo(idx, idx > active ? 1 : -1)}
               className={`
-                h-0.5 rounded-full transition-all duration-300 focus:outline-none
+                h-1 rounded-full transition-all duration-300 focus:outline-none
                 ${idx === active
                   ? 'w-8 bg-primary'
-                  : 'w-4 bg-gray-300 hover:bg-gray-400'
+                  : 'w-5 bg-gray-300 hover:bg-gray-400'
                 }
               `}
             />
