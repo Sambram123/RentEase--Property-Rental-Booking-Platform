@@ -198,4 +198,25 @@ const deleteReview = asyncHandler(async (req, res) => {
   });
 });
 
-export { createReview, getPropertyReviews, updateReview, deleteReview };
+// ─────────────────────────────────────────────────────────────────────────────
+// @desc    Get recent reviews (home page testimonials)
+// @route   GET /api/reviews/recent
+// @access  Public
+// ─────────────────────────────────────────────────────────────────────────────
+const getRecentReviews = asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit, 10) || 6, 12);
+
+  const reviews = await Review.find({ rating: { $gte: 4 } })
+    .populate('user', 'name avatar avatarSeed avatarStyle')
+    .populate('property', 'title city address')
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .lean();
+
+  res.status(200).json({
+    success: true,
+    data: { reviews },
+  });
+});
+
+export { createReview, getPropertyReviews, updateReview, deleteReview, getRecentReviews };

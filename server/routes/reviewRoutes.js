@@ -4,6 +4,7 @@ import {
   getPropertyReviews,
   updateReview,
   deleteReview,
+  getRecentReviews,
 } from '../controllers/reviewController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -11,6 +12,9 @@ const router = express.Router();
 
 // POST   /api/reviews              — create review (auth required)
 router.post('/', protect, createReview);
+
+// GET    /api/reviews/recent                   — get recent high-rated reviews (public)
+router.get('/recent', getRecentReviews);
 
 // GET    /api/reviews/property/:propertyId — get reviews for a property (public)
 router.get('/property/:propertyId', getPropertyReviews);

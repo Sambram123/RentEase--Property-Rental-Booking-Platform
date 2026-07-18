@@ -192,7 +192,7 @@ const getProperties = asyncHandler(async (req, res) => {
 
   // Pagination
   const page  = Math.max(1, Number(req.query.page)  || 1);
-  const limit = Math.min(50, Number(req.query.limit) || 12);
+  const limit = Math.min(500, Number(req.query.limit) || 500);
   const skip  = (page - 1) * limit;
 
   // Sort
